@@ -105,6 +105,17 @@ export function InventoryScanModal({
   const [torchOn, setTorchOn] = useState(false);
   /** Карточка предмета в режиме «что это». */
   const [info, setInfo] = useState<Asset | null>(null);
+  /**
+   * Что происходит с камерой — словами, прямо на экране.
+   *
+   * ⚠️ Раньше отказ камеры был **невидим**: сообщение показывалось только
+   * когда браузер вовсе не умеет getUserMedia, а самый частый случай —
+   * «доступ к камере запрещён» — оставлял чёрный прямоугольник без единого
+   * слова. Выглядело как «сканер не работает», и понять причину было нельзя.
+   */
+  const [diag, setDiag] = useState<{ engine: string; size: string } | null>(null);
+  /** Счётчик попыток: меняется по кнопке «Повторить» и перезапускает камеру. */
+  const [retry, setRetry] = useState(0);
   const [hasTorch, setHasTorch] = useState(false);
   const [starting, setStarting] = useState(false);
 
@@ -502,13 +513,28 @@ export function InventoryScanModal({
         const video = videoRef.current;
         if (!video) return;
         video.srcObject = stream;
-        await video.play();
+        // ⚠️ play() на iPhone умеет отказать (режим энергосбережения, политика
+        // автовоспроизведения). Раньше отказ обрывал весь запуск — картинка
+        // была, а распознавание не начиналось. Теперь это просто отметка.
+        try {
+          await video.play();
+        } catch {
+          setError('Видео не запустилось само — коснитесь кадра');
+        }
+        setDiag({
+          engine: Detector ? 'BarcodeDetector' : 'jsQR',
+          size: video.videoWidth ? `${video.videoWidth}×${video.videoHeight}` : 'кадр ещё не пришёл',
+        });
 
         // Программное декодирование дорогое: 10 кадров в секунду достаточно,
         // чтобы поймать наклейку, и телефон при этом не греется.
         let lastRun = 0;
         const loop = async () => {
-          if (cancelled || !videoRef.current) return;
+          if (cancelled) return;
+          // ⚠️ Пустой ref — не повод останавливать распознавание навсегда:
+          // при перерисовке элемент на кадр-другой пропадает, а прежний код
+          // на этом обрывал цикл, и камера дальше просто показывала картинку.
+          if (!videoRef.current) { rafRef.current = requestAnimationFrame(loop); return; }
           const now = performance.now();
           if (now - lastRun >= 100) {
             lastRun = now;
@@ -520,7 +546,17 @@ export function InventoryScanModal({
         };
         rafRef.current = requestAnimationFrame(loop);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Не удалось открыть камеру');
+        // ⚠️ Родной текст ошибки нечитаем («The request is not allowed by the
+        // user agent…»), а решение у каждой из них разное — переводим.
+        const name = e instanceof Error ? e.name : '';
+        const RU: Record<string, string> = {
+          NotAllowedError: 'Доступ к камере запрещён. Разреши камеру для сайта в настройках браузера и нажми «Повторить».',
+          NotFoundError: 'Камера не найдена на этом устройстве.',
+          NotReadableError: 'Камеру занял другой приложение или вкладка — закрой их и нажми «Повторить».',
+          OverconstrainedError: 'Такой камеры нет — переключись на другую кнопкой 🔄.',
+          SecurityError: 'Браузер заблокировал камеру на этой странице.',
+        };
+        setError(RU[name] || (e instanceof Error ? `${name}: ${e.message}` : 'Не удалось открыть камеру'));
       }
     })();
 
@@ -531,7 +567,7 @@ export function InventoryScanModal({
       streamRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [facing]);
+  }, [facing, retry]);
 
   /** Фонарик. Гасить его при закрытии не нужно — трек останавливается целиком. */
   async function toggleTorch() {
@@ -573,6 +609,16 @@ export function InventoryScanModal({
             ничего нет, а наводить наклейку с вытянутой руки по маленькому
             окошку неудобно. */}
         <div className={`scan-sheet__video ${mode === 'bind' || mode === 'info' ? 'scan-sheet__video--full' : ''}`}>
+          {/* ⚠️ Сообщение об ошибке — поверх кадра и всегда, когда оно есть.
+              Прежде оно рисовалось только вместо камеры (`supported === false`),
+              а отказ в доступе оставлял чёрный экран без объяснений. */}
+          {error && (
+            <div className="scan-error">
+              <div style={{ fontSize: 28 }}>📷</div>
+              <div>{error}</div>
+              <button type="button" className="btn btn--sm" onClick={() => { setError(''); setRetry((n) => n + 1); }}>Повторить</button>
+            </div>
+          )}
           {supported ? (
             <>
               {/* Фронталку зеркалим: иначе рука на экране едет не в ту сторону,
@@ -636,6 +682,12 @@ export function InventoryScanModal({
             </div>
           )}
         </div>
+
+        {diag && (
+          <div className="scan-diag">
+            распознаватель: <b>{diag.engine}</b> · кадр: <b>{diag.size}</b>
+          </div>
+        )}
 
         <div className={`scan-feedback ${last ? `scan-feedback--${last.tone}` : ''}`}>
           {last ? (

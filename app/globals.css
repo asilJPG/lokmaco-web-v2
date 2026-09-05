@@ -1440,6 +1440,34 @@ tr[data-today="true"] td:first-child {
 .scan-info__rows dd { margin: 0; font-weight: 600; text-align: right; }
 .scan-info .btn { align-self: flex-start; }
 
+/* Отказ камеры — поверх кадра, крупно и со словами: чёрный прямоугольник
+   без объяснения читался как «сканер сломался». */
+.scan-error {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+  color: #fff;
+  background: rgba(10, 16, 14, .88);
+  font-size: 14px;
+  line-height: 1.45;
+}
+/* Состояние распознавателя: нужно ровно тогда, когда «не сканирует», —
+   сразу видно, чем читаем и пришёл ли кадр с камеры. */
+.scan-diag {
+  padding: 5px 18px;
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
 /* ---------------- Опись ОС: табличный вид ----------------
    Сознательно похоже на эксель: строка на экземпляр, тонкая сетка, номера
    строк слева, липкие шапка и первая колонка. С такой таблицы сверяют и
