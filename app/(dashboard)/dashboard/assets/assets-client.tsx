@@ -8,6 +8,7 @@ import { TagsModal } from './tags-modal';
 import { AuditsModal } from './audits-modal';
 import { LocationsModal } from './locations-modal';
 import { baseInvNumber, unitLabel } from '@/lib/inv-number';
+import { SortTh, useSort } from '@/components/sortable';
 
 const money = (n: number) => Math.round(n).toLocaleString('ru-RU');
 const day = (v: string | Date | null | undefined) => (v ? new Date(v).toLocaleDateString('ru-RU') : null);
@@ -36,10 +37,29 @@ export function AssetsClient() {
   const [place, setPlace] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  /**
+   * Карточки или плоская таблица.
+   *
+   * Карточки group-ируют партии («Стул белый · 43 шт») — так ищут глазами с
+   * телефона. Таблица показывает каждый экземпляр отдельной строкой, как в
+   * экселе: с неё сверяют, сортируют по стоимости и ищут, у кого нет наклейки.
+   * Выбор запоминается — за компьютером и с телефона смотрят по-разному.
+   */
+  const [view, setView] = useState<'cards' | 'table'>('cards');
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('lokmaco_assets_view');
+      if (v === 'table' || v === 'cards') setView(v);
+    } catch { /* приватный режим — останемся на карточках */ }
+  }, []);
+  function switchView(v: 'cards' | 'table') {
+    setView(v);
+    try { localStorage.setItem('lokmaco_assets_view', v); } catch { /* не критично */ }
+  }
 
   const [editing, setEditing] = useState<AssetForm | null>(null);
   const [qrAsset, setQrAsset] = useState<Asset | null>(null);
-  const [scanMode, setScanMode] = useState<'audit' | 'bind' | null>(null);
+  const [scanMode, setScanMode] = useState<'audit' | 'bind' | 'info' | null>(null);
   /**
    * Оклейка одного конкретного экземпляра из списка.
    *
@@ -119,6 +139,21 @@ export function AssetsClient() {
       };
     }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }, [visible, tagByAsset]);
+
+  /** Плоский список экземпляров для табличного вида. */
+  type Col = 'inv' | 'name' | 'place' | 'tag' | 'cost' | 'mol' | 'status' | 'seen';
+  const table = useSort<Asset, Col>(visible, 'name', (a, key) => {
+    switch (key) {
+      case 'inv': return a.invNumber || '';
+      case 'place': return (a.locationId && locations.find((l) => l.id === a.locationId)?.name) || a.location || '';
+      case 'tag': return tagByAsset.get(a.id) || '';
+      case 'cost': return Number(a.initialCost) || 0;
+      case 'mol': return a.responsiblePerson || '';
+      case 'status': return a.status || '';
+      case 'seen': return a.lastInventoriedAt ? new Date(a.lastInventoriedAt).getTime() : 0;
+      default: return a.name || '';
+    }
+  });
 
   const live = assets.filter((a) => a.status !== 'archived');
   const taggedTotal = live.filter((a) => tagByAsset.has(a.id)).length;
@@ -283,9 +318,12 @@ export function AssetsClient() {
     <div className="grid">
       {msg && <div className={`banner ${msg.ok ? 'banner--success' : 'banner--error'}`}>{msg.text}</div>}
 
-      {/* Обход — то, зачем сюда заходят с телефона. Оклейка живёт в строках списка. */}
+      {/* Две камеры, и это разные действия. «Обход» засчитывает предмет в акт
+          инвентаризации, «Что это» только показывает карточку и ничего не
+          пишет — спрашивают чаще, чем считают. Оклейка живёт в строках списка. */}
       <div className="asset-actions">
         <button type="button" className="btn btn--primary asset-actions__main" onClick={() => setScanMode('audit')}>📷 Обход</button>
+        <button type="button" className="btn asset-actions__main" onClick={() => setScanMode('info')}>ℹ️ Что это</button>
       </div>
 
       {/* Сводка одной строкой. Три отдельные плитки занимали на телефоне целый
@@ -352,6 +390,13 @@ export function AssetsClient() {
       </div>
 
       <div className="asset-chips">
+        <button
+          type="button"
+          className={`btn btn--sm ${view === 'table' ? 'btn--primary' : ''}`}
+          onClick={() => switchView(view === 'table' ? 'cards' : 'table')}
+        >
+          {view === 'table' ? '▤ Таблица' : '▤ Таблицей'}
+        </button>
         <button type="button" className="btn btn--sm" onClick={() => setSheet('tags')}>🏷 Наклейки</button>
         <button type="button" className="btn btn--sm" onClick={() => setSheet('places')}>📍 Места</button>
         <button type="button" className={`btn btn--sm ${showArchived ? 'btn--primary' : ''}`} onClick={() => setShowArchived((v) => !v)}>📦 Архив</button>
@@ -360,7 +405,75 @@ export function AssetsClient() {
         <button type="button" className="btn btn--sm" onClick={exportCsv}>📥 CSV</button>
       </div>
 
-      {kinds.length === 0 ? (
+      {view === 'table' ? (
+        /* ⚠️ Экселем это выглядит намеренно: строка на экземпляр, тонкая сетка,
+           номера строк слева, липкая шапка и первая колонка. С такой таблицы
+           сверяют и выгружают, а не «просматривают» — поэтому здесь нет
+           группировки по видам, которая есть в карточках. */
+        <div className="card xls-card" style={{ padding: 0 }}>
+          <div className="xls-wrap">
+            <table className="xls">
+              <thead>
+                <tr>
+                  <th className="xls__rownum" />
+                  <SortTh label="Инв. №" col="inv" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Наименование" col="name" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Место" col="place" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Наклейка" col="tag" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Стоимость" col="cost" sort={table.sort} onSort={table.toggle} align="right" />
+                  <SortTh label="МОЛ" col="mol" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Статус" col="status" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Обход" col="seen" sort={table.sort} onSort={table.toggle} />
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {table.sorted.map((a, i) => {
+                  const tag = tagByAsset.get(a.id);
+                  const st = STATUS[a.status || 'in_use'] || STATUS.in_use;
+                  return (
+                    <tr key={a.id}>
+                      <td className="xls__rownum">{i + 1}</td>
+                      <td className="xls__mono">{a.invNumber}</td>
+                      <td>
+                        {a.name}
+                        {unitLabel(a, assets) && <span className="xls__dim"> · {unitLabel(a, assets)}</span>}
+                      </td>
+                      <td>{(a.locationId && locations.find((l) => l.id === a.locationId)?.name) || a.location || '—'}</td>
+                      <td className={`xls__mono ${tag ? '' : 'xls__warn'}`}>{tag || 'нет'}</td>
+                      <td className="xls__num">{money(Number(a.initialCost) || 0)}</td>
+                      {/* Дефолтное «Материально-ответственное лицо» стоит почти у
+                          всех и занимает треть ширины, ничего не сообщая. */}
+                      <td>{a.responsiblePerson && a.responsiblePerson !== 'Материально-ответственное лицо' ? a.responsiblePerson : '—'}</td>
+                      <td style={{ color: st.color, whiteSpace: 'nowrap' }}>{st.label}</td>
+                      <td className="xls__mono">{day(a.lastInventoriedAt) || '—'}</td>
+                      <td className="xls__acts">
+                        {!tag && (
+                          <button type="button" className="btn btn--sm btn--icon btn--primary" title="Наклеить QR" onClick={() => { setBindUnit(a); setScanMode('bind'); }}>📷</button>
+                        )}
+                        <button type="button" className="btn btn--sm btn--icon" title="Стикер" onClick={() => setQrAsset(a)}>🏷</button>
+                        <button type="button" className="btn btn--sm btn--icon" title="Изменить" onClick={() => setEditing(toForm(a))}>✎</button>
+                        <button type="button" className="btn btn--sm btn--icon btn--danger" title="Удалить" onClick={() => remove(a)}>✕</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {table.sorted.length === 0 && (
+                  <tr><td colSpan={10}><div className="empty-state">Ничего не найдено</div></td></tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="xls__rownum" />
+                  <td colSpan={4}>Строк: {table.sorted.length}</td>
+                  <td className="xls__num">{money(table.sorted.reduce((s2, a) => s2 + (Number(a.initialCost) || 0), 0))}</td>
+                  <td colSpan={4} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      ) : kinds.length === 0 ? (
         <div className="card"><div className="empty-state" style={{ padding: 40 }}>Ничего не найдено</div></div>
       ) : (
         <div className="asset-list">

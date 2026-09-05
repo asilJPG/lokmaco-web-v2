@@ -22,7 +22,11 @@ type Feedback = {
   state?: 'saving' | 'saved' | 'failed';
 };
 
-type Mode = 'audit' | 'bind';
+/**
+ * `info` — просто посмотреть, что это за предмет: скан ничего не записывает,
+ * ни в обход, ни в наклейки. Нужен чаще всего: «а это что за стол и чей он».
+ */
+type Mode = 'audit' | 'bind' | 'info';
 
 /** Партия: 20 одинаковых столов — один вид и двадцать экземпляров. */
 type Batch = { key: string; name: string; units: Asset[] };
@@ -99,6 +103,8 @@ export function InventoryScanModal({
   const single = Boolean(targetUnitId);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [torchOn, setTorchOn] = useState(false);
+  /** Карточка предмета в режиме «что это». */
+  const [info, setInfo] = useState<Asset | null>(null);
   const [hasTorch, setHasTorch] = useState(false);
   const [starting, setStarting] = useState(false);
 
@@ -238,6 +244,34 @@ export function InventoryScanModal({
     buzz(already ? [40, 60, 40] : 60);
   }
 
+  /**
+   * «Что это»: скан только показывает карточку и **ничего не пишет**.
+   *
+   * Отдельный режим, а не побочный эффект обхода: обход засчитывает предмет и
+   * меняет акт, а тут человек просто спрашивает «что это». Смешивать нельзя —
+   * иначе любопытный скан молча попадёт в инвентаризацию.
+   */
+  function registerInfo(raw: string) {
+    const hit = resolve(raw);
+    if (!hit) return;
+    if (hit.unbound) {
+      setInfo(null);
+      setLast({ tone: 'bad', code: hit.code, title: 'Наклейка ни к чему не привязана', unbound: true });
+      buzz([120]);
+      return;
+    }
+    if (!hit.asset) {
+      setInfo(null);
+      setLast({ tone: 'bad', code: hit.code, title: 'Не найдено в базе' });
+      buzz([120]);
+      return;
+    }
+    setInfo(hit.asset);
+    setLast({ tone: 'ok', code: hit.code, title: hit.asset.name });
+    setFlash((n) => n + 1);
+    buzz(60);
+  }
+
   /** Оклейка: скан привязывает наклейку к следующему экземпляру партии. */
   async function registerBind(raw: string) {
     const code = normalizeTagCode(raw);
@@ -356,7 +390,9 @@ export function InventoryScanModal({
     const now = Date.now();
     if (raw === seenRef.current.code && now - seenRef.current.at < REPEAT_MS) return;
     seenRef.current = { code: raw, at: now };
-    if (mode === 'bind') void registerBind(raw); else registerAudit(raw);
+    if (mode === 'bind') void registerBind(raw);
+    else if (mode === 'info') registerInfo(raw);
+    else registerAudit(raw);
   };
 
   /** Буфер обхода: связь в подвале пропадает, телефон садится. */
@@ -516,14 +552,18 @@ export function InventoryScanModal({
 
   return (
     <div className="scan-overlay">
-      <div className={`scan-sheet ${mode === 'bind' ? 'scan-sheet--cam' : ''}`}>
+      <div className={`scan-sheet ${mode === 'bind' || mode === 'info' ? 'scan-sheet--cam' : ''}`}>
         <div className="scan-sheet__head">
           <div>
             <div style={{ fontSize: 16, fontWeight: 800 }}>
-              {mode === 'bind' ? '🏷 Оклейка' : '📷 Инвентаризация'}
+              {mode === 'bind' ? '🏷 Оклейка' : mode === 'info' ? 'ℹ️ Что это' : '📷 Инвентаризация'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              {mode === 'bind' ? 'Наклей пустую наклейку и наведи камеру — привяжется само' : 'Наведите камеру на наклейку'}
+              {mode === 'bind'
+                ? 'Наклей пустую наклейку и наведи камеру — привяжется само'
+                : mode === 'info'
+                  ? 'Наведи на наклейку — покажу карточку. Ничего не записывается'
+                  : 'Наведите камеру на наклейку'}
             </div>
           </div>
           <button type="button" className="btn btn--sm" onClick={onClose}>✕</button>
@@ -532,7 +572,7 @@ export function InventoryScanModal({
         {/* В оклейке кадр занимает всё, что осталось от экрана: под ним больше
             ничего нет, а наводить наклейку с вытянутой руки по маленькому
             окошку неудобно. */}
-        <div className={`scan-sheet__video ${mode === 'bind' ? 'scan-sheet__video--full' : ''}`}>
+        <div className={`scan-sheet__video ${mode === 'bind' || mode === 'info' ? 'scan-sheet__video--full' : ''}`}>
           {supported ? (
             <>
               {/* Фронталку зеркалим: иначе рука на экране едет не в ту сторону,
@@ -568,6 +608,15 @@ export function InventoryScanModal({
               {/* Вспышка на весь кадр — подтверждение, которое видно, даже
                   когда телефон в вытянутой руке и текст не читается. */}
               {flash > 0 && <div key={flash} className="scan-flash" />}
+              {mode === 'info' && info && (
+                <InfoCard
+                  asset={info}
+                  all={assets}
+                  tag={tagByAsset.get(info.id)}
+                  place={(info.locationId && placeName.get(info.locationId)) || info.location || ''}
+                  onClose={() => { setInfo(null); setLast(null); }}
+                />
+              )}
               {mode === 'bind' && batch && (
                 <div className="scan-target">
                   <div className="scan-target__name">
@@ -616,7 +665,20 @@ export function InventoryScanModal({
         </div>
 
         <div className="scan-sheet__body">
-          {mode === 'bind' ? (
+          {mode === 'info' ? (
+            /* Кроме камеры здесь нужен только ручной ввод: наклейку заляпали,
+               а узнать, что это, всё равно надо. */
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="input"
+                value={manual}
+                placeholder="Код наклейки или инв. номер"
+                onChange={(e) => setManual(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { handleRef.current(manual); setManual(''); } }}
+              />
+              <button type="button" className="btn btn--sm" onClick={() => { handleRef.current(manual); setManual(''); }}>Найти</button>
+            </div>
+          ) : mode === 'bind' ? (
             <>
               {/* ⚠️ Под камерой больше ничего нет. Здесь была лента выбора
                   оборудования, поиск, место и список экземпляров — убрано
@@ -697,8 +759,10 @@ export function InventoryScanModal({
         <div className="scan-sheet__foot">
           {/* В оклейке одной наклейки кнопка одна: камера и так закрывается
               сама после привязки, «Свернуть» рядом с «Готово» только путало. */}
-          {!single && <button type="button" className="btn" onClick={onClose}>Свернуть</button>}
-          {mode === 'bind' ? (
+          {!single && mode !== 'info' && <button type="button" className="btn" onClick={onClose}>Свернуть</button>}
+          {mode === 'info' ? (
+            <button type="button" className="btn btn--primary" onClick={onClose}>Закрыть</button>
+          ) : mode === 'bind' ? (
             <button type="button" className="btn btn--primary" onClick={async () => { await onBound(); onClose(); }}>
               {single ? 'Закрыть' : 'Готово'}
             </button>
@@ -847,3 +911,63 @@ function BindTagModal({ code, assets, locations, onClose, onDone }: {
     </div>
   );
 }
+
+/**
+ * Карточка предмета поверх кадра — ответ на вопрос «что это».
+ *
+ * Именно поверх, а не отдельной страницей: телефон уже поднят к наклейке,
+ * и уводить человека с камеры ради двух строк данных незачем — следующий
+ * скан просто заменит карточку.
+ */
+function InfoCard({ asset, all, tag, place, onClose }: {
+  asset: Asset;
+  all: Asset[];
+  tag?: string;
+  place: string;
+  onClose: () => void;
+}) {
+  const money = (v: unknown) => `${Math.round(Number(v) || 0).toLocaleString('ru-RU')} сум`;
+  const day = (v: string | Date | null | undefined) => (v ? new Date(v).toLocaleDateString('ru-RU') : '—');
+  const st = STATUS_LABEL[asset.status || 'in_use'] || STATUS_LABEL.in_use;
+
+  return (
+    <div className="scan-info">
+      <div className="scan-info__head">
+        <div>
+          <div className="scan-info__name">{asset.name}</div>
+          <div className="scan-info__inv">
+            {asset.invNumber}
+            {unitLabel(asset, all) && <span> · {unitLabel(asset, all)}</span>}
+          </div>
+        </div>
+        <button type="button" className="scan-cam-btn" onClick={onClose} title="Закрыть">✕</button>
+      </div>
+
+      <dl className="scan-info__rows">
+        <div><dt>Место</dt><dd>{place || '—'}</dd></div>
+        {/* Дефолтное «Материально-ответственное лицо» стоит почти у всех и
+            ничего не сообщает — в карточке это просто длинная строка. */}
+        <div><dt>МОЛ</dt><dd>{asset.responsiblePerson && asset.responsiblePerson !== 'Материально-ответственное лицо' ? asset.responsiblePerson : '—'}</dd></div>
+        <div><dt>Наклейка</dt><dd>{tag || 'нет'}</dd></div>
+        <div><dt>Стоимость</dt><dd>{money(asset.initialCost)}</dd></div>
+        <div><dt>Статус</dt><dd>{st}</dd></div>
+        <div><dt>Последний обход</dt><dd>{day(asset.lastInventoriedAt)}</dd></div>
+        {asset.serialNumber && <div><dt>Код iiko</dt><dd>{asset.serialNumber}</dd></div>}
+        <div><dt>Дата ввода</dt><dd>{day(asset.commissioningDate)}</dd></div>
+      </dl>
+
+      <a className="btn btn--sm" href={`/dashboard/assets/${asset.id}`} target="_blank" rel="noreferrer">
+        Открыть карточку целиком
+      </a>
+    </div>
+  );
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  in_use: '🟢 В эксплуатации',
+  repair: '🟡 В ремонте',
+  in_stock: '🔵 На складе',
+  written_off: '🔴 Списан',
+  sold: '⚪ Продан',
+  archived: '📦 Архив',
+};
