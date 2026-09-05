@@ -113,7 +113,7 @@ export function InventoryScanModal({
    * «доступ к камере запрещён» — оставлял чёрный прямоугольник без единого
    * слова. Выглядело как «сканер не работает», и понять причину было нельзя.
    */
-  const [diag, setDiag] = useState<{ engine: string; size: string } | null>(null);
+  const [diag, setDiag] = useState<{ engine: string; size: string; frames: number } | null>(null);
   /** Счётчик попыток: меняется по кнопке «Повторить» и перезапускает камеру. */
   const [retry, setRetry] = useState(0);
   const [hasTorch, setHasTorch] = useState(false);
@@ -481,26 +481,59 @@ export function InventoryScanModal({
           detect = async (video) => (await d.detect(video)).map((c) => c.rawValue || '');
         } else {
           const { default: jsQR } = await import('jsqr');
-          detect = (video) => {
+
+          /**
+           * ⚠️ Читаем **середину кадра в родных пикселях**, а не весь кадр,
+           * сжатый до 640px.
+           *
+           * Из-за сжатия наклейка 44 мм с расстояния вытянутой руки давала
+           * меньше двух пикселей на модуль QR — jsQR такое не берёт, и сканер
+           * «не реагировал ни на что», хотя штатная камера телефона тот же код
+           * читала мгновенно (она снимает в полном разрешении). Середина —
+           * это ровно то, что обведено рамкой-прицелом.
+           *
+           * Каждый третий кадр всё же разбираем целиком (сжатым): код может
+           * оказаться сбоку, и терять его из-за прицела нельзя.
+           */
+          let tick = 0;
+          const read = (video: HTMLVideoElement, sx: number, sy: number, sw: number, sh: number, max: number) => {
             const canvas = canvasRef.current;
-            if (!canvas || !video.videoWidth) return [];
-            // Кадр целиком jsQR жуёт слишком долго — хватает 640px по ширине.
-            const scale = Math.min(1, 640 / video.videoWidth);
-            const w = Math.round(video.videoWidth * scale);
-            const h = Math.round(video.videoHeight * scale);
+            if (!canvas) return null;
+            const scale = Math.min(1, max / sw);
+            const w = Math.max(1, Math.round(sw * scale));
+            const h = Math.max(1, Math.round(sh * scale));
             if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            if (!ctx) return [];
-            ctx.drawImage(video, 0, 0, w, h);
-            const code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
-            return code?.data ? [code.data] : [];
+            if (!ctx) return null;
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+            return jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' })?.data || null;
+          };
+
+          detect = (video) => {
+            if (!video.videoWidth) return [];
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            tick++;
+
+            if (tick % 3 !== 0) {
+              const side = Math.round(Math.min(vw, vh) * 0.72);
+              const hit = read(video, Math.round((vw - side) / 2), Math.round((vh - side) / 2), side, side, 1000);
+              if (hit) return [hit];
+            }
+            const whole = read(video, 0, 0, vw, vh, 800);
+            return whole ? [whole] : [];
           };
         }
 
         // ⚠️ `exact` не ставим: на ноутбуке и на планшете задней камеры может
         // не быть вовсе, и с `exact` getUserMedia падает вместо того, чтобы
         // взять единственную.
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } });
+        // ⚠️ Разрешение просим явно. По умолчанию iPhone отдаёт 640×480 — при
+        // таком кадре мелкий QR наклейки физически неразличим, и сканер молчит.
+        // `ideal`, а не `exact`: где столько нет, браузер сам возьмёт меньше.
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         streamRef.current = stream;
 
@@ -521,14 +554,16 @@ export function InventoryScanModal({
         } catch {
           setError('Видео не запустилось само — коснитесь кадра');
         }
-        setDiag({
-          engine: Detector ? 'BarcodeDetector' : 'jsQR',
-          size: video.videoWidth ? `${video.videoWidth}×${video.videoHeight}` : 'кадр ещё не пришёл',
-        });
+        const engine = Detector ? 'BarcodeDetector' : 'jsQR';
+        setDiag({ engine, size: 'ждём кадр', frames: 0 });
 
         // Программное декодирование дорогое: 10 кадров в секунду достаточно,
         // чтобы поймать наклейку, и телефон при этом не греется.
         let lastRun = 0;
+        // Состояние обновляем раз в секунду: по нему видно, идут ли кадры и в
+        // каком они разрешении — первое, что нужно знать, когда «не сканирует».
+        let frames = 0;
+        let lastDiag = 0;
         const loop = async () => {
           if (cancelled) return;
           // ⚠️ Пустой ref — не повод останавливать распознавание навсегда:
@@ -540,7 +575,17 @@ export function InventoryScanModal({
             lastRun = now;
             try {
               for (const raw of await detect(videoRef.current)) handleRef.current(raw);
+              frames++;
             } catch { /* кадр не распознался — не страшно */ }
+            if (now - lastDiag > 1000) {
+              lastDiag = now;
+              const v = videoRef.current;
+              setDiag({
+                engine,
+                size: v.videoWidth ? `${v.videoWidth}×${v.videoHeight}` : 'кадра нет',
+                frames,
+              });
+            }
           }
           rafRef.current = requestAnimationFrame(loop);
         };
@@ -685,7 +730,7 @@ export function InventoryScanModal({
 
         {diag && (
           <div className="scan-diag">
-            распознаватель: <b>{diag.engine}</b> · кадр: <b>{diag.size}</b>
+            распознаватель: <b>{diag.engine}</b> · кадр: <b>{diag.size}</b> · разобрано кадров: <b>{diag.frames}</b>
           </div>
         )}
 
