@@ -45,16 +45,19 @@ export function useSort<T, K extends string>(
   return { sorted, sort, toggle };
 }
 
-export function SortTh<K extends string>({ label, col, sort, onSort, align = 'left' }: {
+export function SortTh<K extends string>({ label, col, sort, onSort, align = 'left', className }: {
   label: string;
   col: K;
   sort: SortState<K>;
   onSort: (col: K) => void;
   align?: 'left' | 'right';
+  /** Классы колонки — по ним таблица прячет второстепенное на узком экране. */
+  className?: string;
 }) {
   const active = sort.key === col;
   return (
     <th
+      className={className}
       onClick={() => onSort(col)}
       style={{
         padding: '10px 8px', textAlign: align, borderBottom: '1px solid var(--border)',

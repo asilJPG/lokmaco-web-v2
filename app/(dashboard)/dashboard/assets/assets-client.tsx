@@ -11,6 +11,9 @@ import { baseInvNumber, unitLabel } from '@/lib/inv-number';
 import { SortTh, useSort } from '@/components/sortable';
 
 const money = (n: number) => Math.round(n).toLocaleString('ru-RU');
+/** МОЛ без дефолтной подписи: она стоит почти у всех и ничего не сообщает. */
+const mol = (a: Asset) => (a.responsiblePerson && a.responsiblePerson !== 'Материально-ответственное лицо' ? a.responsiblePerson : '');
+const placeOf = (a: Asset, ls: AssetLocation[]) => (a.locationId && ls.find((l) => l.id === a.locationId)?.name) || a.location || '';
 const day = (v: string | Date | null | undefined) => (v ? new Date(v).toLocaleDateString('ru-RU') : null);
 
 /** Вид оборудования: одна номенклатура iiko и все её экземпляры. */
@@ -416,14 +419,12 @@ export function AssetsClient() {
               <thead>
                 <tr>
                   <th className="xls__rownum" />
-                  <SortTh label="Инв. №" col="inv" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Инв. №" col="inv" sort={table.sort} onSort={table.toggle} className="col-inv" />
                   <SortTh label="Наименование" col="name" sort={table.sort} onSort={table.toggle} />
-                  <SortTh label="Место" col="place" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Место" col="place" sort={table.sort} onSort={table.toggle} className="col-place" />
                   <SortTh label="Наклейка" col="tag" sort={table.sort} onSort={table.toggle} />
-                  <SortTh label="Стоимость" col="cost" sort={table.sort} onSort={table.toggle} align="right" />
-                  <SortTh label="МОЛ" col="mol" sort={table.sort} onSort={table.toggle} />
-                  <SortTh label="Статус" col="status" sort={table.sort} onSort={table.toggle} />
-                  <SortTh label="Обход" col="seen" sort={table.sort} onSort={table.toggle} />
+                  <SortTh label="Стоимость" col="cost" sort={table.sort} onSort={table.toggle} align="right" className="col-cost" />
+                  <SortTh label="Обход" col="seen" sort={table.sort} onSort={table.toggle} className="col-seen" />
                   <th />
                 </tr>
               </thead>
@@ -434,40 +435,64 @@ export function AssetsClient() {
                   return (
                     <tr key={a.id}>
                       <td className="xls__rownum">{i + 1}</td>
-                      <td className="xls__mono">{a.invNumber}</td>
-                      <td>
-                        {a.name}
+                      <td className="xls__mono col-inv">{a.invNumber}</td>
+                      {/* Наименование забирает к себе всё, что прячется на узком
+                          экране: инвентарный номер, место и МОЛ уходят второй
+                          строкой, а не пропадают совсем. */}
+                      <td className="xls__name">
+                        <span>
+                          {/* Статус отдельной колонкой был мёртвым грузом: у всех
+                              позиций он «в эксплуатации». Точка появляется, только
+                              когда статус другой. */}
+                          {a.status !== 'in_use' && <b style={{ color: st.color }} title={st.label}>● </b>}
+                          {a.name}
+                        </span>
                         {unitLabel(a, assets) && <span className="xls__dim"> · {unitLabel(a, assets)}</span>}
+                        <span className="xls__sub">
+                          <span className="only-narrow">{a.invNumber} · {placeOf(a, locations) || '—'}</span>
+                          {mol(a) && <span className="only-narrow"> · </span>}
+                          {mol(a) && <span>{mol(a)}</span>}
+                          {/* На телефоне стоимость тоже переезжает сюда: колонкой
+                              она не помещалась, а цифра нужна. */}
+                          <span className="only-xs"> · {money(Number(a.initialCost) || 0)} сум</span>
+                        </span>
                       </td>
-                      <td>{(a.locationId && locations.find((l) => l.id === a.locationId)?.name) || a.location || '—'}</td>
+                      <td className="col-place">
+                        {placeOf(a, locations) || '—'}
+                        {mol(a) && <div className="xls__sub">{mol(a)}</div>}
+                      </td>
                       <td className={`xls__mono ${tag ? '' : 'xls__warn'}`}>{tag || 'нет'}</td>
-                      <td className="xls__num">{money(Number(a.initialCost) || 0)}</td>
-                      {/* Дефолтное «Материально-ответственное лицо» стоит почти у
-                          всех и занимает треть ширины, ничего не сообщая. */}
-                      <td>{a.responsiblePerson && a.responsiblePerson !== 'Материально-ответственное лицо' ? a.responsiblePerson : '—'}</td>
-                      <td style={{ color: st.color, whiteSpace: 'nowrap' }}>{st.label}</td>
-                      <td className="xls__mono">{day(a.lastInventoriedAt) || '—'}</td>
+                      <td className="xls__num col-cost">{money(Number(a.initialCost) || 0)}</td>
+                      <td className="xls__mono col-seen">{day(a.lastInventoriedAt) || '—'}</td>
                       <td className="xls__acts">
                         {!tag && (
                           <button type="button" className="btn btn--sm btn--icon btn--primary" title="Наклеить QR" onClick={() => { setBindUnit(a); setScanMode('bind'); }}>📷</button>
                         )}
-                        <button type="button" className="btn btn--sm btn--icon" title="Стикер" onClick={() => setQrAsset(a)}>🏷</button>
-                        <button type="button" className="btn btn--sm btn--icon" title="Изменить" onClick={() => setEditing(toForm(a))}>✎</button>
-                        <button type="button" className="btn btn--sm btn--icon btn--danger" title="Удалить" onClick={() => remove(a)}>✕</button>
+                        {/* Кнопки уходят в том же порядке, что и колонки: на узком экране
+                            остаются камера и правка — то, ради чего в таблицу и
+                            заходят с телефона. Печать стикера и удаление есть в
+                            карточном виде. */}
+                        <button type="button" className="btn btn--sm btn--icon col-seen" title="Стикер" onClick={() => setQrAsset(a)}>🏷</button>
+                        <button type="button" className="btn btn--sm btn--icon col-cost" title="Изменить" onClick={() => setEditing(toForm(a))}>✎</button>
+                        <button type="button" className="btn btn--sm btn--icon btn--danger col-place" title="Удалить" onClick={() => remove(a)}>✕</button>
                       </td>
                     </tr>
                   );
                 })}
                 {table.sorted.length === 0 && (
-                  <tr><td colSpan={10}><div className="empty-state">Ничего не найдено</div></td></tr>
+                  <tr><td colSpan={8}><div className="empty-state">Ничего не найдено</div></td></tr>
                 )}
               </tbody>
               <tfoot>
                 <tr>
                   <td className="xls__rownum" />
-                  <td colSpan={4}>Строк: {table.sorted.length}</td>
-                  <td className="xls__num">{money(table.sorted.reduce((s2, a) => s2 + (Number(a.initialCost) || 0), 0))}</td>
-                  <td colSpan={4} />
+                  <td className="col-inv" />
+                  <td>Строк: {table.sorted.length}</td>
+                  <td className="col-place" />
+                  <td />
+                  <td className="xls__num col-cost">{money(table.sorted.reduce((s2, a) => s2 + (Number(a.initialCost) || 0), 0))}</td>
+                  <td className="col-seen" />
+                  <td />
                 </tr>
               </tfoot>
             </table>
