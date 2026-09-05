@@ -72,6 +72,16 @@ export function AssetsClient() {
    * теперь один: нашёл в списке → 📷 → навёл на пустую наклейку.
    */
   const [bindUnit, setBindUnit] = useState<Asset | null>(null);
+  /**
+   * Меню действий строки — для узкого экрана.
+   *
+   * ⚠️ На телефоне четыре кнопки в строку не влезают, а прятать половину
+   * нельзя: печать стикера и правка нужны с телефона ровно так же, как с
+   * компьютера. Поэтому на узком экране остаётся камера и «⋯», а всё
+   * остальное — в шторке, где у действий есть подписи и по ним не промахнёшься
+   * (в частности, «Удалить» не окажется под пальцем рядом с «Изменить»).
+   */
+  const [rowMenu, setRowMenu] = useState<Asset | null>(null);
   const [sheet, setSheet] = useState<'tags' | 'audits' | 'places' | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [splitting, setSplitting] = useState(false);
@@ -507,15 +517,18 @@ export function AssetsClient() {
                             </button>
                           ) : (
                             <>
+                              {/* ⚠️ На телефоне в ячейке помещается ровно одна
+                                  кнопка, поэтому там остаётся только «⋯», а
+                                  «Наклеить QR» стоит первым пунктом шторки. */}
                               {!tag && (
-                                <button type="button" className="btn btn--sm btn--icon btn--primary" title="Наклеить QR" onClick={() => { setBindUnit(head); setScanMode('bind'); }}>📷</button>
+                                <button type="button" className="btn btn--sm btn--icon btn--primary col-phone" title="Наклеить QR" onClick={() => { setBindUnit(head); setScanMode('bind'); }}>📷</button>
                               )}
-                              {/* Кнопки уходят в том же порядке, что и колонки: на узком
-                                  экране остаются камера и правка. Печать стикера и
-                                  удаление есть в карточном виде. */}
-                              <button type="button" className="btn btn--sm btn--icon col-seen" title="Стикер" onClick={() => setQrAsset(head)}>🏷</button>
-                              <button type="button" className="btn btn--sm btn--icon col-cost" title="Изменить" onClick={() => setEditing(toForm(head))}>✎</button>
-                              <button type="button" className="btn btn--sm btn--icon btn--danger col-place" title="Удалить" onClick={() => remove(head)}>✕</button>
+                              {/* Широкий экран — кнопки в строке; узкий — «⋯» со
+                                  всем тем же набором. Пропадать ничего не должно. */}
+                              <button type="button" className="btn btn--sm btn--icon col-wide" title="Стикер" onClick={() => setQrAsset(head)}>🏷</button>
+                              <button type="button" className="btn btn--sm btn--icon col-wide" title="Изменить" onClick={() => setEditing(toForm(head))}>✎</button>
+                              <button type="button" className="btn btn--sm btn--icon btn--danger col-wide" title="Удалить" onClick={() => remove(head)}>✕</button>
+                              <button type="button" className="btn btn--sm btn--icon xls__more" title="Ещё" onClick={() => setRowMenu(head)}>⋯</button>
                             </>
                           )}
                         </td>
@@ -540,11 +553,12 @@ export function AssetsClient() {
                             <td className="xls__mono col-seen">{day(u.lastInventoriedAt) || '—'}</td>
                             <td className="xls__acts">
                               {!utag && (
-                                <button type="button" className="btn btn--sm btn--icon btn--primary" title="Наклеить QR" onClick={() => { setBindUnit(u); setScanMode('bind'); }}>📷</button>
+                                <button type="button" className="btn btn--sm btn--icon btn--primary col-phone" title="Наклеить QR" onClick={() => { setBindUnit(u); setScanMode('bind'); }}>📷</button>
                               )}
-                              <button type="button" className="btn btn--sm btn--icon col-seen" title="Стикер" onClick={() => setQrAsset(u)}>🏷</button>
-                              <button type="button" className="btn btn--sm btn--icon col-cost" title="Изменить" onClick={() => setEditing(toForm(u))}>✎</button>
-                              <button type="button" className="btn btn--sm btn--icon btn--danger col-place" title="Удалить" onClick={() => remove(u)}>✕</button>
+                              <button type="button" className="btn btn--sm btn--icon col-wide" title="Стикер" onClick={() => setQrAsset(u)}>🏷</button>
+                              <button type="button" className="btn btn--sm btn--icon col-wide" title="Изменить" onClick={() => setEditing(toForm(u))}>✎</button>
+                              <button type="button" className="btn btn--sm btn--icon btn--danger col-wide" title="Удалить" onClick={() => remove(u)}>✕</button>
+                              <button type="button" className="btn btn--sm btn--icon xls__more" title="Ещё" onClick={() => setRowMenu(u)}>⋯</button>
                             </td>
                           </tr>
                         );
@@ -661,6 +675,17 @@ export function AssetsClient() {
         </div>
       )}
 
+      {rowMenu && (
+        <RowMenu
+          asset={rowMenu}
+          tag={tagByAsset.get(rowMenu.id)}
+          onClose={() => setRowMenu(null)}
+          onBind={() => { setBindUnit(rowMenu); setScanMode('bind'); setRowMenu(null); }}
+          onSticker={() => { setQrAsset(rowMenu); setRowMenu(null); }}
+          onEdit={() => { setEditing(toForm(rowMenu)); setRowMenu(null); }}
+          onDelete={async () => { const a = rowMenu; setRowMenu(null); await remove(a); }}
+        />
+      )}
       {editing && <AssetFormModal initial={editing} locations={locations} onSave={save} onClose={() => setEditing(null)} />}
       {qrAsset && <QrStickerModal asset={qrAsset} onClose={() => setQrAsset(null)} />}
       {sheet === 'audits' && <AuditsModal locations={locations} onClose={() => setSheet(null)} />}
@@ -678,6 +703,59 @@ export function AssetsClient() {
           onClose={() => { setScanMode(null); setBindUnit(null); }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Действия строки на узком экране.
+ *
+ * Шторкой снизу, а не выпадающим меню: до низа экрана большой палец достаёт,
+ * до середины строки в списке — нет. У каждого действия подпись, поэтому
+ * «Удалить» невозможно нажать вместо «Изменить», как это было бы с четырьмя
+ * иконками по 30px в ряд.
+ */
+function RowMenu({ asset, tag, onClose, onBind, onSticker, onEdit, onDelete }: {
+  asset: Asset;
+  tag?: string;
+  onClose: () => void;
+  onBind: () => void;
+  onSticker: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="row-sheet" onClick={onClose}>
+      <div className="row-sheet__panel" onClick={(e) => e.stopPropagation()}>
+        <div className="row-sheet__head">
+          <div>
+            <div className="row-sheet__name">{asset.name}</div>
+            <div className="row-sheet__inv">
+              {asset.invNumber}
+              {tag ? ` · 🏷 ${tag}` : ' · без наклейки'}
+            </div>
+          </div>
+          <button type="button" className="btn btn--sm" onClick={onClose}>✕</button>
+        </div>
+
+        {!tag && (
+          <button type="button" className="row-sheet__item" onClick={onBind}>
+            <span>📷</span> Наклеить QR
+          </button>
+        )}
+        <button type="button" className="row-sheet__item" onClick={onSticker}>
+          <span>🏷</span> Стикер и печать
+        </button>
+        <button type="button" className="row-sheet__item" onClick={onEdit}>
+          <span>✎</span> Изменить
+        </button>
+        <a className="row-sheet__item" href={`/dashboard/assets/${asset.id}`}>
+          <span>ℹ️</span> Открыть карточку
+        </a>
+        <button type="button" className="row-sheet__item row-sheet__item--danger" onClick={onDelete}>
+          <span>✕</span> Удалить
+        </button>
+      </div>
     </div>
   );
 }

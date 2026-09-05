@@ -1569,11 +1569,63 @@ tr[data-today="true"] td:first-child {
    без линий и рамок. */
 .xls__unit td { background: color-mix(in srgb, var(--surface-muted) 30%, transparent); }
 .xls__unit .xls__name { padding-left: 18px; font-weight: 400; }
+
+/* Шторка действий строки: снизу, крупными строками — до низа экрана большой
+   палец достаёт, до середины списка нет. */
+.row-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(8, 14, 12, .5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.row-sheet__panel {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 -12px 40px -16px rgba(0, 0, 0, .5);
+}
+.row-sheet__head { display: flex; align-items: flex-start; gap: 12px; padding: 2px 4px 10px; }
+.row-sheet__name { font-size: 15px; font-weight: 700; line-height: 1.25; }
+.row-sheet__inv { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.row-sheet__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.row-sheet__item:hover { background: var(--accent-soft); }
+.row-sheet__item--danger { color: var(--danger, #dc2626); }
+.row-sheet__item span { font-size: 17px; width: 22px; text-align: center; }
 /* ---- Что прячем и в каком порядке, когда экрана не хватает ----
    Порядок обратный ценности: сначала уходит дата обхода, потом место с МОЛ,
    потом инвентарный номер. Всё спрятанное перетекает второй строкой под
    название, поэтому данные не теряются — теряются только колонки. */
-@media (max-width: 1180px) { .xls .col-seen { display: none; } }
+/* Кнопки строки: на широком — в ряд, на узком — одна «⋯» со всем набором.
+   Прятать действия нельзя, их нужно перекладывать. */
+.xls__more { display: none; }
+@media (max-width: 1180px) {
+  .xls .col-seen { display: none; }
+  .xls .col-wide { display: none; }
+  .xls__more { display: inline-flex; }
+}
 @media (max-width: 1080px) {
   /* Инвентарный номер и место прячем **вместе** и одновременно показываем
      вторую строку под названием — иначе колонка с номером дублировала бы то,
@@ -1610,6 +1662,9 @@ tr[data-today="true"] td:first-child {
   /* Ширину колонки «Наклейка» задавала не ячейка, а сам заголовок: разрядка
      и 11px делали слово шире кода под ним. */
   .xls thead th { font-size: 10px; letter-spacing: 0; padding: 6px 5px; }
+  /* В ячейку действий на телефоне помещается одна кнопка — оставляем «⋯»,
+     в шторке первым пунктом стоит «Наклеить QR». */
+  .xls .col-phone { display: none; }
 }
 
 .xls tfoot td {
