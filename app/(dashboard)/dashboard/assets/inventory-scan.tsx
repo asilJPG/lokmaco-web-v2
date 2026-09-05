@@ -200,11 +200,26 @@ export function InventoryScanModal({
     // а «её ещё не оформили», и человеку это надо сказать прямо.
     if (code && looksLikeTag(raw)) return { asset: null, code, unbound: true };
 
+    // ⚠️ Стикер конкретного предмета (кнопка 🏷) несёт ссылку с **инвентарным
+    // номером**: `…/tag/INV-INV-2147`. Раньше из ссылки доставали только коды
+    // наклеек `LKM-*`, а остальное проваливалось в разбор голого текста — и
+    // ссылка там не проходила проверку на «номер без лишних символов». Скан
+    // такого стикера **молча игнорировался**: камера светила, счётчик кадров
+    // рос, на экране не появлялось ничего (поймано 05.09.2026 на живом
+    // стикере «Бойлер Silverinox»).
+    if (code && byInv.has(code)) return { asset: byInv.get(code)!, code };
+
     const text = String(raw || '');
     const m = text.match(/Инв\.\s*№\s*[:：]?\s*([A-Za-zА-Яа-я0-9\-_]+)/i);
     const inv = m ? m[1].trim().toUpperCase() : (/^[A-Z0-9\-_]{3,}$/i.test(text.trim()) ? text.trim().toUpperCase() : null);
-    if (!inv) return null;
-    return { asset: byInv.get(inv) || null, code: inv };
+    if (inv) return { asset: byInv.get(inv) || null, code: inv };
+
+    // ⚠️ Молчать нельзя. Непонятный QR (чужая наклейка, реклама на стене)
+    // должен сказать о себе: иначе сканер выглядит сломанным ровно так же,
+    // как при настоящей поломке.
+    if (code) return { asset: null, code };
+    const shown = text.trim().slice(0, 40);
+    return shown ? { asset: null, code: shown } : null;
   }
 
   function buzz(pattern: number | number[]) {
