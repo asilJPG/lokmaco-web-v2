@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { Asset, AssetLocation, AssetTag } from '@/db/schema';
 import { AssetFormModal, QrStickerModal, STATUS, emptyForm, toForm, type AssetForm } from './asset-modals';
 import { InventoryScanModal } from './inventory-scan';
@@ -144,19 +144,39 @@ export function AssetsClient() {
   }, [visible, tagByAsset]);
 
   /** Плоский список экземпляров для табличного вида. */
-  type Col = 'inv' | 'name' | 'place' | 'tag' | 'cost' | 'mol' | 'status' | 'seen';
-  const table = useSort<Asset, Col>(visible, 'name', (a, key) => {
+  type Col = 'inv' | 'name' | 'place' | 'tag' | 'cost' | 'seen';
+  /**
+   * Таблица тоже идёт по видам, а не по экземплярам.
+   *
+   * Сорок три одинаковых стула сорока тремя строками — это не таблица, а
+   * простыня: пролистать её, чтобы дойти до следующего предмета, нельзя.
+   * Партия сворачивается в одну строку «Стул белый · 43 шт», а экземпляры
+   * раскрываются по клику — там, где действительно нужно знать, какой именно.
+   */
+  const table = useSort<Kind, Col>(kinds, 'name', (k, key) => {
     switch (key) {
-      case 'inv': return a.invNumber || '';
-      case 'place': return (a.locationId && locations.find((l) => l.id === a.locationId)?.name) || a.location || '';
-      case 'tag': return tagByAsset.get(a.id) || '';
-      case 'cost': return Number(a.initialCost) || 0;
-      case 'mol': return a.responsiblePerson || '';
-      case 'status': return a.status || '';
-      case 'seen': return a.lastInventoriedAt ? new Date(a.lastInventoriedAt).getTime() : 0;
-      default: return a.name || '';
+      case 'inv': return k.base || '';
+      case 'place': return placeOf(k.head, locations);
+      case 'tag': return k.tagged;
+      case 'cost': return k.cost;
+      case 'seen': return k.lastDay ? new Date(k.lastDay).getTime() : 0;
+      default: return k.name || '';
     }
   });
+  /** Какие партии раскрыты в таблице. Можно держать открытыми сразу несколько. */
+  const [openRows, setOpenRows] = useState<Set<string>>(new Set());
+  function toggleRow(key: string) {
+    setOpenRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+  /** Место у партии одно на всех — если нет, так и пишем. */
+  function placeOfKind(k: Kind): string {
+    const all = new Set(k.units.map((u) => placeOf(u, locations) || '—'));
+    return all.size === 1 ? [...all][0] : `разные (${all.size})`;
+  }
 
   const live = assets.filter((a) => a.status !== 'archived');
   const taggedTotal = live.filter((a) => tagByAsset.has(a.id)).length;
@@ -429,54 +449,107 @@ export function AssetsClient() {
                 </tr>
               </thead>
               <tbody>
-                {table.sorted.map((a, i) => {
-                  const tag = tagByAsset.get(a.id);
-                  const st = STATUS[a.status || 'in_use'] || STATUS.in_use;
+                {table.sorted.map((k, i) => {
+                  const many = k.units.length > 1;
+                  const expanded = openRows.has(k.key);
+                  const head = k.head;
+                  const tag = tagByAsset.get(head.id);
+                  const st = STATUS[head.status || 'in_use'] || STATUS.in_use;
                   return (
-                    <tr key={a.id}>
-                      <td className="xls__rownum">{i + 1}</td>
-                      <td className="xls__mono col-inv">{a.invNumber}</td>
-                      {/* Наименование забирает к себе всё, что прячется на узком
-                          экране: инвентарный номер, место и МОЛ уходят второй
-                          строкой, а не пропадают совсем. */}
-                      <td className="xls__name">
-                        <span>
-                          {/* Статус отдельной колонкой был мёртвым грузом: у всех
-                              позиций он «в эксплуатации». Точка появляется, только
-                              когда статус другой. */}
-                          {a.status !== 'in_use' && <b style={{ color: st.color }} title={st.label}>● </b>}
-                          {a.name}
-                        </span>
-                        {unitLabel(a, assets) && <span className="xls__dim"> · {unitLabel(a, assets)}</span>}
-                        <span className="xls__sub">
-                          <span className="only-narrow">{a.invNumber} · {placeOf(a, locations) || '—'}</span>
-                          {mol(a) && <span className="only-narrow"> · </span>}
-                          {mol(a) && <span>{mol(a)}</span>}
-                          {/* На телефоне стоимость тоже переезжает сюда: колонкой
-                              она не помещалась, а цифра нужна. */}
-                          <span className="only-xs"> · {money(Number(a.initialCost) || 0)} сум</span>
-                        </span>
-                      </td>
-                      <td className="col-place">
-                        {placeOf(a, locations) || '—'}
-                        {mol(a) && <div className="xls__sub">{mol(a)}</div>}
-                      </td>
-                      <td className={`xls__mono ${tag ? '' : 'xls__warn'}`}>{tag || 'нет'}</td>
-                      <td className="xls__num col-cost">{money(Number(a.initialCost) || 0)}</td>
-                      <td className="xls__mono col-seen">{day(a.lastInventoriedAt) || '—'}</td>
-                      <td className="xls__acts">
-                        {!tag && (
-                          <button type="button" className="btn btn--sm btn--icon btn--primary" title="Наклеить QR" onClick={() => { setBindUnit(a); setScanMode('bind'); }}>📷</button>
-                        )}
-                        {/* Кнопки уходят в том же порядке, что и колонки: на узком экране
-                            остаются камера и правка — то, ради чего в таблицу и
-                            заходят с телефона. Печать стикера и удаление есть в
-                            карточном виде. */}
-                        <button type="button" className="btn btn--sm btn--icon col-seen" title="Стикер" onClick={() => setQrAsset(a)}>🏷</button>
-                        <button type="button" className="btn btn--sm btn--icon col-cost" title="Изменить" onClick={() => setEditing(toForm(a))}>✎</button>
-                        <button type="button" className="btn btn--sm btn--icon btn--danger col-place" title="Удалить" onClick={() => remove(a)}>✕</button>
-                      </td>
-                    </tr>
+                    <Fragment key={k.key}>
+                      <tr className={many ? 'xls__group' : undefined}>
+                        <td className="xls__rownum">{i + 1}</td>
+                        <td className="xls__mono col-inv">{many ? k.base : head.invNumber}</td>
+                        {/* Наименование забирает к себе всё, что прячется на узком
+                            экране: номер, место и МОЛ уходят второй строкой, а не
+                            пропадают совсем. */}
+                        <td className="xls__name">
+                          {many ? (
+                            <button type="button" className="xls__toggle" onClick={() => toggleRow(k.key)}>
+                              <span className="xls__chev">{expanded ? '▾' : '▸'}</span>
+                              <span>{k.name}</span>
+                              <span className="xls__count">{k.units.length} шт</span>
+                            </button>
+                          ) : (
+                            <span>
+                              {/* Статус отдельной колонкой был мёртвым грузом: у всех
+                                  позиций он «в эксплуатации». Точка появляется, только
+                                  когда статус другой. */}
+                              {head.status !== 'in_use' && <b style={{ color: st.color }} title={st.label}>● </b>}
+                              {head.name}
+                            </span>
+                          )}
+                          <span className="xls__sub">
+                            <span className="only-narrow">{many ? k.base : head.invNumber} · {placeOfKind(k)}</span>
+                            {!many && mol(head) && <span className="only-narrow"> · </span>}
+                            {!many && mol(head) && <span>{mol(head)}</span>}
+                            {/* На телефоне стоимость тоже переезжает сюда: колонкой
+                                она не помещалась, а цифра нужна. */}
+                            <span className="only-xs"> · {money(k.cost)} сум</span>
+                          </span>
+                        </td>
+                        <td className="col-place">
+                          {placeOfKind(k)}
+                          {!many && mol(head) && <div className="xls__sub">{mol(head)}</div>}
+                        </td>
+                        {/* У партии в этой колонке готовность к обходу, а не код:
+                            двадцать кодов в ячейку не влезут, а «17 из 20» — ответ
+                            на единственный вопрос, который здесь задают. */}
+                        <td className={`xls__mono ${many ? (k.tagged === k.units.length ? '' : 'xls__warn') : (tag ? '' : 'xls__warn')}`}>
+                          {many ? `${k.tagged} из ${k.units.length}` : (tag || 'нет')}
+                        </td>
+                        <td className="xls__num col-cost">{money(k.cost)}</td>
+                        <td className="xls__mono col-seen">{k.lastDay ? day(k.lastDay) : '—'}</td>
+                        <td className="xls__acts">
+                          {many ? (
+                            <button type="button" className="btn btn--sm btn--icon" title="Показать экземпляры" onClick={() => toggleRow(k.key)}>
+                              {expanded ? '▾' : '▸'}
+                            </button>
+                          ) : (
+                            <>
+                              {!tag && (
+                                <button type="button" className="btn btn--sm btn--icon btn--primary" title="Наклеить QR" onClick={() => { setBindUnit(head); setScanMode('bind'); }}>📷</button>
+                              )}
+                              {/* Кнопки уходят в том же порядке, что и колонки: на узком
+                                  экране остаются камера и правка. Печать стикера и
+                                  удаление есть в карточном виде. */}
+                              <button type="button" className="btn btn--sm btn--icon col-seen" title="Стикер" onClick={() => setQrAsset(head)}>🏷</button>
+                              <button type="button" className="btn btn--sm btn--icon col-cost" title="Изменить" onClick={() => setEditing(toForm(head))}>✎</button>
+                              <button type="button" className="btn btn--sm btn--icon btn--danger col-place" title="Удалить" onClick={() => remove(head)}>✕</button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+
+                      {many && expanded && k.units.map((u) => {
+                        const utag = tagByAsset.get(u.id);
+                        return (
+                          <tr key={u.id} className="xls__unit">
+                            <td className="xls__rownum" />
+                            <td className="xls__mono col-inv">{u.invNumber}</td>
+                            <td className="xls__name">
+                              <span className="xls__dim">└ {unitLabel(u, assets) || u.invNumber}</span>
+                              <span className="xls__sub">
+                                <span className="only-narrow">{u.invNumber} · {placeOf(u, locations) || '—'}</span>
+                                <span className="only-xs"> · {money(Number(u.initialCost) || 0)} сум</span>
+                              </span>
+                            </td>
+                            <td className="col-place">{placeOf(u, locations) || '—'}</td>
+                            <td className={`xls__mono ${utag ? '' : 'xls__warn'}`}>{utag || 'нет'}</td>
+                            <td className="xls__num col-cost">{money(Number(u.initialCost) || 0)}</td>
+                            <td className="xls__mono col-seen">{day(u.lastInventoriedAt) || '—'}</td>
+                            <td className="xls__acts">
+                              {!utag && (
+                                <button type="button" className="btn btn--sm btn--icon btn--primary" title="Наклеить QR" onClick={() => { setBindUnit(u); setScanMode('bind'); }}>📷</button>
+                              )}
+                              <button type="button" className="btn btn--sm btn--icon col-seen" title="Стикер" onClick={() => setQrAsset(u)}>🏷</button>
+                              <button type="button" className="btn btn--sm btn--icon col-cost" title="Изменить" onClick={() => setEditing(toForm(u))}>✎</button>
+                              <button type="button" className="btn btn--sm btn--icon btn--danger col-place" title="Удалить" onClick={() => remove(u)}>✕</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
                   );
                 })}
                 {table.sorted.length === 0 && (
@@ -487,10 +560,12 @@ export function AssetsClient() {
                 <tr>
                   <td className="xls__rownum" />
                   <td className="col-inv" />
-                  <td>Строк: {table.sorted.length}</td>
+                  <td>
+                    Видов: {table.sorted.length} · единиц: {table.sorted.reduce((n, k) => n + k.units.length, 0)}
+                  </td>
                   <td className="col-place" />
                   <td />
-                  <td className="xls__num col-cost">{money(table.sorted.reduce((s2, a) => s2 + (Number(a.initialCost) || 0), 0))}</td>
+                  <td className="xls__num col-cost">{money(table.sorted.reduce((s2, k) => s2 + k.cost, 0))}</td>
                   <td className="col-seen" />
                   <td />
                 </tr>

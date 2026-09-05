@@ -1537,6 +1537,38 @@ tr[data-today="true"] td:first-child {
 .xls__dim { color: var(--text-faint); }
 .xls__warn { color: var(--warning); }
 .xls__acts { display: flex; gap: 4px; }
+
+/* Партия одинаковых предметов — одна строка с раскрытием. Сорок три стула
+   сорока тремя строками превращали таблицу в простыню, по которой нельзя
+   долистать до следующего предмета. */
+.xls__toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.xls__chev { font-size: 10px; color: var(--text-faint); }
+.xls__count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+}
+.xls__group td { font-weight: 600; }
+/* Экземпляры внутри партии — тише и с отступом, чтобы вложенность читалась
+   без линий и рамок. */
+.xls__unit td { background: color-mix(in srgb, var(--surface-muted) 30%, transparent); }
+.xls__unit .xls__name { padding-left: 18px; font-weight: 400; }
 /* ---- Что прячем и в каком порядке, когда экрана не хватает ----
    Порядок обратный ценности: сначала уходит дата обхода, потом место с МОЛ,
    потом инвентарный номер. Всё спрятанное перетекает второй строкой под
@@ -1561,7 +1593,8 @@ tr[data-today="true"] td:first-child {
   .xls .col-cost { display: none; }
   .xls__name .only-xs { display: inline; }
   .xls__mono { font-size: 11px; }
-  .xls th, .xls td { padding: 5px 6px; }
+  .xls th, .xls td { padding: 5px 4px; }
+  .xls__rownum { width: 26px; min-width: 26px; }
   /* Строки на телефоне высокие (название переносится), поэтому содержимое
      прижимаем к верху — иначе кнопка болтается по центру пустой ячейки. */
   .xls td { vertical-align: top; }
@@ -1570,6 +1603,13 @@ tr[data-today="true"] td:first-child {
      треть строки. Здесь кнопки меньше: строка и так высокая, промахнуться
      мимо неё сложно. Переопределяем и width/height, иначе они побеждают. */
   .xls .btn--icon { width: 30px; height: 30px; min-height: 30px; padding: 2px; }
+  /* Вложенные строки на телефоне отступают меньше: 18px отступа хватало,
+     чтобы таблица опять не влезла в 375px. */
+  .xls__unit .xls__name { padding-left: 10px; }
+  .xls__name { min-width: 104px; }
+  /* Ширину колонки «Наклейка» задавала не ячейка, а сам заголовок: разрядка
+     и 11px делали слово шире кода под ним. */
+  .xls thead th { font-size: 10px; letter-spacing: 0; padding: 6px 5px; }
 }
 
 .xls tfoot td {
