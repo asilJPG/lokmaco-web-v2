@@ -121,6 +121,13 @@ export const assets = pgTable('assets', {
   /** Место размещения. Текстовое `location` остаётся: в него пишет легаси-бот. */
   locationId: uuid('location_id'),
   /**
+   * Привязка к карте размещения (плану помещения).
+   * Координаты x и y сохраняются в долях (0..1) от ширины и высоты плана.
+   */
+  floorPlanId: uuid('floor_plan_id'),
+  floorPlanX: numeric('floor_plan_x'),
+  floorPlanY: numeric('floor_plan_y'),
+  /**
    * Откуда карточка: `iiko` — из справочника, `manual` — завели на сайте.
    * Сверка архивирует только импортные: заведённого руками в iiko нет по
    * определению, и без признака оно уезжало бы в архив на первой же сверке.
@@ -128,7 +135,31 @@ export const assets = pgTable('assets', {
   source: text('source').notNull().default('iiko'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-});
+}, (t) => ({
+  byFilial: index('assets_filial_idx').on(t.filialId),
+  byFloorPlan: index('assets_floor_plan_idx').on(t.floorPlanId),
+}));
+
+/**
+ * Графические планы этажей и помещений для визуальной карты оборудования.
+ * Хранятся per-filial.
+ * planType: 'image' (загруженная картинка) или 'drawing' (нарисованная в редакторе схема).
+ */
+export const assetFloorPlans = pgTable('asset_floor_plans', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  filialId: integer('filial_id').notNull().default(1),
+  name: text('name').notNull(),
+  imageUrl: text('image_url').notNull().default(''),
+  imagePath: text('image_path').notNull().default(''),
+  width: integer('width').notNull().default(0),
+  height: integer('height').notNull().default(0),
+  planType: text('plan_type').notNull().default('image'),
+  drawingData: jsonb('drawing_data'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  byFilial: index('asset_floor_plans_filial_idx').on(t.filialId),
+}));
 
 /** Места размещения ОС. Плоский список: «Кухня», «Бар», «Зал». */
 export const assetLocations = pgTable('asset_locations', {
@@ -248,7 +279,30 @@ export const scanInbox = pgTable('scan_inbox', {
   byFilialStatus: index('scan_inbox_filial_status_idx').on(t.filialId, t.status, t.createdAt),
 }));
 
+export interface DrawingShape {
+  id: string;
+  type: 'rect' | 'line' | 'text';
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+  stroke?: string;
+  label?: string;
+  x2?: number;
+  y2?: number;
+  text?: string;
+  fontSize?: number;
+}
+
+export interface DrawingData {
+  canvasWidth: number;
+  canvasHeight: number;
+  shapes: DrawingShape[];
+}
+
 export type Asset = typeof assets.$inferSelect;
+export type AssetFloorPlan = typeof assetFloorPlans.$inferSelect;
 export type AssetLocation = typeof assetLocations.$inferSelect;
 export type AssetTag = typeof assetTags.$inferSelect;
 export type AssetAudit = typeof assetAudits.$inferSelect;

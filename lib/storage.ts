@@ -28,22 +28,25 @@ export const INVOICE_BUCKET = 'invoices';
  * появления пофрагментных фото; в интерфейсе он больше не предлагается, но
  * старые записи в истории его содержат, и подпись для них нужна.
  */
-export type PhotoKind = 'goods' | 'invoice' | 'item' | 'collage';
+export type PhotoKind = 'goods' | 'invoice' | 'item' | 'collage' | 'floor_plan';
 
-export const PHOTO_KINDS: PhotoKind[] = ['goods', 'invoice', 'item', 'collage'];
+export const PHOTO_KINDS: PhotoKind[] = ['goods', 'invoice', 'item', 'collage', 'floor_plan'];
 
 export const PHOTO_LABELS: Record<PhotoKind, string> = {
   goods: 'Фото товара',
   invoice: 'Фото накладной',
   item: 'Фото позиции',
   collage: 'Позиции одним листом',
+  floor_plan: 'План помещения',
 };
 
 // Клиент жмёт фото до ~1600px/jpeg 0.8 (обычно 150–400 КБ). 3 МБ — потолок
 // с большим запасом: всё, что больше, значит сжатие на клиенте не отработало.
 export const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
+// Планы помещений могут быть детализированными схемами до 10 МБ.
+export const MAX_FLOOR_PLAN_BYTES = 10 * 1024 * 1024;
 
-export const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/webp', 'image/png'];
+export const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/webp', 'image/png', 'image/svg+xml'];
 
 function creds(): { url: string; key: string } {
   const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
@@ -71,6 +74,7 @@ const EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
   'image/png': 'png',
+  'image/svg+xml': 'svg',
 };
 
 /**
@@ -85,7 +89,7 @@ export function buildPhotoPath(filialId: number, kind: PhotoKind, contentType: s
 
 /** Путь принадлежит одному из филиалов пользователя? Заодно отсекает `..` и абсолютные пути. */
 export function isPathAllowed(path: string, filialIds: number[]): boolean {
-  if (!/^\d+\/\d{4}-\d{2}-\d{2}\/[a-f0-9-]{36}-(goods|invoice|item|collage)\.(jpg|webp|png)$/.test(path)) return false;
+  if (!/^\d+\/\d{4}-\d{2}-\d{2}\/[a-f0-9-]{36}-(goods|invoice|item|collage|floor_plan)\.(jpg|webp|png|svg)$/.test(path)) return false;
   return filialIds.includes(Number(path.split('/')[0]));
 }
 

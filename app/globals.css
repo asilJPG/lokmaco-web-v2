@@ -2119,3 +2119,505 @@ tr[data-today="true"] td:first-child {
 .table-stack--gap { margin: 8px 0; }
 .table-stack--sep { border-top: 1px solid var(--border); }
 .tag-sheet--one { grid-template-columns: 60mm; }
+
+/* ==========================================================================
+   Визуальная карта размещения основных средств (Floor Plan)
+   ========================================================================== */
+.floor-plan-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.floor-plan-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.floor-plan-topbar__left,
+.floor-plan-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.floor-plan-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.floor-plan-layout.is-placing {
+  grid-template-columns: 1fr 340px;
+}
+
+.floor-plan-viewport {
+  position: relative;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: 520px;
+  height: 68vh;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+}
+
+.floor-plan-zoom-bar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.floor-plan-zoom-val {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 6px;
+  min-width: 44px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.floor-plan-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.floor-plan-canvas {
+  position: relative;
+  display: inline-block;
+}
+
+.floor-plan-img {
+  display: block;
+  max-width: none;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.map-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  z-index: 5;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.map-pin:hover {
+  transform: translate(-50%, -105%) scale(1.1);
+  z-index: 8;
+}
+
+.map-pin.is-movable {
+  cursor: grab;
+}
+
+.map-pin.is-dragging {
+  cursor: grabbing;
+  transform: translate(-50%, -100%) scale(1.2);
+  z-index: 20;
+  opacity: 0.85;
+}
+
+.map-pin.is-selected {
+  z-index: 9;
+}
+
+.map-pin.is-selected .map-pin__dot {
+  box-shadow: 0 0 0 4px var(--accent);
+}
+
+.map-pin__dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 13px;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.map-pin__icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.map-pin__label {
+  margin-top: 3px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  backdrop-filter: blur(4px);
+}
+
+.map-popover {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  max-width: 360px;
+  width: calc(100% - 32px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 15;
+}
+
+.map-popover__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.map-popover__title {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.map-popover__inv {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.map-popover__body {
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.map-popover__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-popover__label {
+  color: var(--text-muted);
+}
+
+.map-popover__foot {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.floor-plan-sidebar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 68vh;
+}
+
+.floor-plan-sidebar__head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.floor-plan-sidebar__filters {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-muted);
+}
+
+.floor-plan-sidebar__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.unplaced-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.unplaced-item:hover {
+  background: var(--surface-muted);
+}
+
+.unplaced-item.is-pending {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.unplaced-item__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.unplaced-item__name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unplaced-item__meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+@media (max-width: 768px) {
+  .floor-plan-layout.is-placing {
+    grid-template-columns: 1fr;
+  }
+  .floor-plan-sidebar {
+    max-height: 300px;
+  }
+  .floor-plan-viewport {
+    height: 52vh;
+    min-height: 380px;
+  }
+}
+
+/* ==========================================================================
+   Редактор схемы помещений (Floor Plan Drawing Editor)
+   ========================================================================== */
+.drawing-editor-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+
+.drawing-editor-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 1200px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.drawing-editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  background: var(--surface);
+}
+
+.drawing-editor-head__left,
+.drawing-editor-head__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawing-editor-name {
+  min-width: 260px;
+  font-weight: 700;
+}
+
+.drawing-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.drawing-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawing-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.drawing-toolbar__btn:hover {
+  background: var(--surface-muted);
+  border-color: var(--accent);
+}
+
+.drawing-toolbar__btn.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.drawing-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawing-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid #ccc;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.drawing-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.drawing-color-swatch.is-active {
+  box-shadow: 0 0 0 2px var(--accent);
+  transform: scale(1.1);
+}
+
+.drawing-inspector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.drawing-inspector__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.drawing-inspector__label {
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.drawing-canvas-viewport {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+}
+
+.drawing-svg-canvas {
+  background: var(--surface);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  width: 100%;
+  max-width: 1000px;
+  height: auto;
+  aspect-ratio: 1200 / 800;
+  touch-action: none;
+}
+
+.drawing-handle {
+  fill: #ffffff;
+  stroke: var(--accent);
+  stroke-width: 2;
+  transition: transform 0.1s;
+}
+
+.drawing-handle:hover {
+  transform: scale(1.3);
+}
+
+@media (max-width: 768px) {
+  .drawing-editor-wrap {
+    height: 96vh;
+    border-radius: 8px;
+  }
+  .drawing-editor-name {
+    min-width: 160px;
+  }
+  .drawing-toolbar {
+    padding: 6px 8px;
+  }
+  .drawing-toolbar__btn {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+  .drawing-canvas-viewport {
+    padding: 8px;
+  }
+}
+
+

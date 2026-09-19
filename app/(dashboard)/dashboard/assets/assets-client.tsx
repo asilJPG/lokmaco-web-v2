@@ -9,6 +9,7 @@ import { AuditsModal } from './audits-modal';
 import { ActModal, type Act } from './act-modal';
 import { LocationsModal } from './locations-modal';
 import { BatchCostModal } from './batch-cost-modal';
+import { FloorPlanView } from './floor-plan';
 import { baseInvNumber, unitLabel } from '@/lib/inv-number';
 import { SortTh, useSort } from '@/components/sortable';
 
@@ -43,21 +44,22 @@ export function AssetsClient() {
   const [showArchived, setShowArchived] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   /**
-   * Карточки или плоская таблица.
+   * Карточки, плоская таблица или визуальная карта.
    *
    * Карточки group-ируют партии («Стул белый · 43 шт») — так ищут глазами с
    * телефона. Таблица показывает каждый экземпляр отдельной строкой, как в
    * экселе: с неё сверяют, сортируют по стоимости и ищут, у кого нет наклейки.
+   * Карта позволяет видеть физическое размещение оборудования на плане этажа.
    * Выбор запоминается — за компьютером и с телефона смотрят по-разному.
    */
-  const [view, setView] = useState<'cards' | 'table'>('cards');
+  const [view, setView] = useState<'cards' | 'table' | 'map'>('cards');
   useEffect(() => {
     try {
       const v = localStorage.getItem('lokmaco_assets_view');
-      if (v === 'table' || v === 'cards') setView(v);
+      if (v === 'table' || v === 'cards' || v === 'map') setView(v);
     } catch { /* приватный режим — останемся на карточках */ }
   }, []);
-  function switchView(v: 'cards' | 'table') {
+  function switchView(v: 'cards' | 'table' | 'map') {
     setView(v);
     try { localStorage.setItem('lokmaco_assets_view', v); } catch { /* не критично */ }
   }
@@ -447,10 +449,24 @@ export function AssetsClient() {
       <div className="asset-chips">
         <button
           type="button"
-          className={`btn btn--sm ${view === 'table' ? 'btn--primary' : ''}`}
-          onClick={() => switchView(view === 'table' ? 'cards' : 'table')}
+          className={`btn btn--sm ${view === 'cards' ? 'btn--primary' : ''}`}
+          onClick={() => switchView('cards')}
         >
-          {view === 'table' ? '▤ Таблица' : '▤ Таблицей'}
+          🗂 Карточки
+        </button>
+        <button
+          type="button"
+          className={`btn btn--sm ${view === 'table' ? 'btn--primary' : ''}`}
+          onClick={() => switchView('table')}
+        >
+          ▤ Таблица
+        </button>
+        <button
+          type="button"
+          className={`btn btn--sm ${view === 'map' ? 'btn--primary' : ''}`}
+          onClick={() => switchView('map')}
+        >
+          🗺 Карта
         </button>
         <button type="button" className="btn btn--sm" onClick={() => setSheet('tags')}>🏷 Наклейки</button>
         <button type="button" className="btn btn--sm" onClick={() => setSheet('places')}>📍 Места</button>
@@ -460,7 +476,16 @@ export function AssetsClient() {
         <button type="button" className="btn btn--sm" onClick={exportCsv}>📥 CSV</button>
       </div>
 
-      {view === 'table' ? (
+      {view === 'map' ? (
+        <FloorPlanView
+          assets={assets}
+          tags={tags}
+          locations={locations}
+          onRefresh={load}
+          onEditAsset={(a) => setEditing(toForm(a))}
+          onOpenSticker={(a) => setQrAsset(a)}
+        />
+      ) : view === 'table' ? (
         /* ⚠️ Экселем это выглядит намеренно: строка на экземпляр, тонкая сетка,
            номера строк слева, липкая шапка и первая колонка. С такой таблицы
            сверяют и выгружают, а не «просматривают» — поэтому здесь нет
