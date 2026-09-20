@@ -36,6 +36,7 @@ export default function CashierForm({ defaultDate }: { defaultDate: string }) {
   const [empError, setEmpError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [iikoResult, setIikoResult] = useState<{ iikoRevenue: number; diff: number; iikoError: string | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +113,9 @@ export default function CashierForm({ defaultDate }: { defaultDate: string }) {
         setMsg({ ok: false, text: data.error || 'Ошибка' });
       } else {
         setMsg({ ok: true, text: `Сохранено: ${data.documentNumber}` });
+        if (data.iikoRevenue !== undefined) {
+          setIikoResult({ iikoRevenue: data.iikoRevenue, diff: data.diff, iikoError: data.iikoError });
+        }
         setPayments(Object.fromEntries(PAYMENT_FIELDS.map((f) => [f.key, ''])) as Record<PaymentKey, string>);
         setExpenses([]);
         setSurplus('');
@@ -245,6 +249,32 @@ export default function CashierForm({ defaultDate }: { defaultDate: string }) {
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} className="textarea" placeholder="Необязательно…" />
         </div>
       </section>
+
+      {iikoResult && (
+        <section className="card">
+          <div className="card__title"><span className="card__title-text">📊 Сверка с iiko</span></div>
+          {iikoResult.iikoError ? (
+            <div className="banner banner--warn">⚠️ {iikoResult.iikoError} — сверка будет доступна в месячном отчёте</div>
+          ) : (
+            <div className="grid grid--3" style={{ gap: 12 }}>
+              <div className="stat-card">
+                <div className="stat-card__label">Выручка по iiko</div>
+                <div className="stat-card__value">{fmt(iikoResult.iikoRevenue)}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-card__label">Ввёл кассир</div>
+                <div className="stat-card__value">{fmt(iikoResult.iikoRevenue + iikoResult.diff)}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-card__label">Разница</div>
+                <div className={`stat-card__value ${iikoResult.diff === 0 ? '' : iikoResult.diff > 0 ? 'text-green' : 'text-red'}`}>
+                  {iikoResult.diff === 0 ? '0 ✓' : `${iikoResult.diff > 0 ? '+' : ''}${fmt(iikoResult.diff)}`}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="action-bar">
         {msg && (
