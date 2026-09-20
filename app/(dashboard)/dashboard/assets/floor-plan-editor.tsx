@@ -3,18 +3,32 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { DrawingData, DrawingShape } from '@/db/schema';
 
-const PRESET_COLORS = [
-  { name: 'Кухня (зелёный)', fill: '#e8f4e8', stroke: '#8bc34a' },
-  { name: 'Зал (синий)', fill: '#e8e8f4', stroke: '#5c6bc0' },
-  { name: 'Склад (красный)', fill: '#f4e8e8', stroke: '#e57373' },
-  { name: 'Подсобка (жёлтый)', fill: '#f4f0e8', stroke: '#fbc02d' },
-  { name: 'Фиолетовый', fill: '#f0e8f4', stroke: '#ba68c8' },
-  { name: 'Голубой', fill: '#e8f0f4', stroke: '#4fc3f7' },
-  { name: 'Коридор (серый)', fill: '#f4f4f4', stroke: '#bdbdbd' },
+// Предустановленные палитры зон с понятными названиями и иконками
+export const ROOM_PRESETS = [
+  { label: 'Кухня', icon: '🍳', fill: '#e8f4e8', stroke: '#7cb342' },
+  { label: 'Главный зал', icon: '🍽', fill: '#e8e8f4', stroke: '#5c6bc0' },
+  { label: 'Бар', icon: '☕️', fill: '#fff3e0', stroke: '#fb8c00' },
+  { label: 'Склад', icon: '📦', fill: '#f4e8e8', stroke: '#e57373' },
+  { label: 'Мойка', icon: '🧼', fill: '#e0f7fa', stroke: '#00acc1' },
+  { label: 'Санузел', icon: '🚻', fill: '#f3e5f5', stroke: '#ab47bc' },
+  { label: 'Терраса', icon: '🌿', fill: '#f1f8e9', stroke: '#8bc34a' },
+  { label: 'Касса / Ресепшн', icon: '💼', fill: '#e8f0f4', stroke: '#039be5' },
+  { label: 'Коридор / Проход', icon: '🚪', fill: '#f5f5f5', stroke: '#9e9e9e' },
+  { label: 'Подсобка', icon: '🗄', fill: '#fbf0e4', stroke: '#d7ccc8' },
+];
+
+export const PRESET_COLORS = [
+  { name: 'Зелёный (кухня)', fill: '#e8f4e8', stroke: '#7cb342' },
+  { name: 'Синий (зал)', fill: '#e8e8f4', stroke: '#5c6bc0' },
+  { name: 'Оранжевый (бар)', fill: '#fff3e0', stroke: '#fb8c00' },
+  { name: 'Красный (склад)', fill: '#f4e8e8', stroke: '#e57373' },
+  { name: 'Бирюзовый (мойка)', fill: '#e0f7fa', stroke: '#00acc1' },
+  { name: 'Фиолетовый', fill: '#f3e5f5', stroke: '#ab47bc' },
+  { name: 'Серый (проход)', fill: '#f5f5f5', stroke: '#9e9e9e' },
 ];
 
 type Tool = 'select' | 'rect' | 'line' | 'text';
-type HandleType = 'nw' | 'ne' | 'se' | 'sw';
+type HandleType = 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w';
 
 interface FloorPlanEditorProps {
   initialName?: string;
@@ -37,14 +51,28 @@ export function FloorPlanEditor({
   const [tool, setTool] = useState<Tool>('rect');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Сетка и привязка
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const gridSize = 20;
+
+  // Зум и панорамирование внутри редактора
+  const [zoom, setZoom] = useState(1);
+  const [editorPan, setEditorPan] = useState({ x: 0, y: 0 });
+
+  // История для Undo / Redo
+  const [history, setHistory] = useState<DrawingShape[][]>([initialData?.shapes || []]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
   const [activeColor, setActiveColor] = useState(PRESET_COLORS[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Интерактивное рисование и перетаскивание
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [drawingState, setDrawingState] = useState<{
-    action: 'draw' | 'move' | 'resize';
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  // Состояние активного рисования / перемещения / ресайза
+  const [actionState, setActionState] = useState<{
+    type: 'draw' | 'move' | 'resize';
     startX: number;
     startY: number;
     currentX: number;
@@ -53,75 +81,229 @@ export function FloorPlanEditor({
     origShape?: DrawingShape;
   } | null>(null);
 
-  // Конвертация экранных координат в логические координаты SVG (0..1200, 0..800)
+  // Добавление в историю изменений
+  const pushHistory = useCallback((nextShapes: DrawingShape[]) => {
+    setHistory((prev) => {
+      const trimmed = prev.slice(0, historyIndex + 1);
+      return [...trimmed, nextShapes];
+    });
+    setHistoryIndex((prev) => prev + 1);
+  }, [historyIndex]);
+
+  function undo() {
+    if (historyIndex > 0) {
+      const prevIdx = historyIndex - 1;
+      setHistoryIndex(prevIdx);
+      setShapes(history[prevIdx]);
+      setSelectedId(null);
+    }
+  }
+
+  function redo() {
+    if (historyIndex < history.length - 1) {
+      const nextIdx = historyIndex + 1;
+      setHistoryIndex(nextIdx);
+      setShapes(history[nextIdx]);
+      setSelectedId(null);
+    }
+  }
+
+  // Конвертация экранных координат через точную SVG CTM матрицу
   const getSvgCoords = useCallback((e: React.PointerEvent | PointerEvent) => {
-    if (!svgRef.current) return { x: 0, y: 0 };
-    const rect = svgRef.current.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
-    const clientX = e.clientX - rect.left;
-    const clientY = e.clientY - rect.top;
-    const x = Math.round((clientX / rect.width) * canvasWidth);
-    const y = Math.round((clientY / rect.height) * canvasHeight);
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+
+    const svgP = pt.matrixTransform(ctm.inverse());
+    let x = Math.round(svgP.x);
+    let y = Math.round(svgP.y);
+
+    if (snapToGrid) {
+      x = Math.round(x / gridSize) * gridSize;
+      y = Math.round(y / gridSize) * gridSize;
+    }
+
     return {
       x: Math.max(0, Math.min(canvasWidth, x)),
       y: Math.max(0, Math.min(canvasHeight, y)),
     };
-  }, [canvasWidth, canvasHeight]);
+  }, [canvasWidth, canvasHeight, snapToGrid, gridSize]);
 
   const selectedShape = shapes.find((s) => s.id === selectedId) || null;
 
-  // Удаление выбранной фигуры по Backspace / Delete
+  // Горячие клавиши (Delete, Escape, Ctrl+Z, Ctrl+Y, 1-4 тулбар)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedId) {
           e.preventDefault();
           deleteSelected();
         }
+      } else if (e.key === 'Escape') {
+        setSelectedId(null);
+        setTool('select');
+      } else if (e.key === 'v' || e.key === 'V' || e.key === '1') {
+        setTool('select');
+      } else if (e.key === 'r' || e.key === 'R' || e.key === '2') {
+        setTool('rect');
+      } else if (e.key === 'l' || e.key === 'L' || e.key === '3') {
+        setTool('line');
+      } else if (e.key === 't' || e.key === 'T' || e.key === '4') {
+        setTool('text');
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId]);
+  }, [selectedId, historyIndex, history]);
 
   function deleteSelected() {
     if (!selectedId) return;
-    setShapes((prev) => prev.filter((s) => s.id !== selectedId));
+    const next = shapes.filter((s) => s.id !== selectedId);
+    setShapes(next);
+    setSelectedId(null);
+    pushHistory(next);
+  }
+
+  function updateSelected(patch: Partial<DrawingShape>, commit = false) {
+    if (!selectedId) return;
+    const next = shapes.map((s) => (s.id === selectedId ? { ...s, ...patch } : s));
+    setShapes(next);
+    if (commit) pushHistory(next);
+  }
+
+  // Применение пресета комнаты к выбранной зоне
+  function applyPreset(preset: typeof ROOM_PRESETS[0]) {
+    if (!selectedShape || selectedShape.type !== 'rect') {
+      // Если ничего не выбрано — создаем зону по центру
+      const w = 240;
+      const h = 160;
+      const x = Math.round((canvasWidth - w) / 2);
+      const y = Math.round((canvasHeight - h) / 2);
+      const newRect: DrawingShape = {
+        id: crypto.randomUUID(),
+        type: 'rect',
+        x,
+        y,
+        width: w,
+        height: h,
+        fill: preset.fill,
+        stroke: preset.stroke,
+        label: `${preset.icon} ${preset.label}`,
+      };
+      const next = [...shapes, newRect];
+      setShapes(next);
+      setSelectedId(newRect.id);
+      setTool('select');
+      pushHistory(next);
+      return;
+    }
+
+    updateSelected({
+      label: `${preset.icon} ${preset.label}`,
+      fill: preset.fill,
+      stroke: preset.stroke,
+    }, true);
+  }
+
+  // Загрузка готового стартового шаблона (Зал + Кухня + Бар + Склад + Санузел)
+  function loadStarterTemplate() {
+    if (shapes.length > 0 && !confirm('Заменить текущую схему базовым шаблоном ресторана?')) return;
+
+    const tpl: DrawingShape[] = [
+      {
+        id: crypto.randomUUID(),
+        type: 'rect',
+        x: 40,
+        y: 40,
+        width: 740,
+        height: 720,
+        fill: '#e8e8f4',
+        stroke: '#5c6bc0',
+        label: '🍽 Главный зал для гостей',
+      },
+      {
+        id: crypto.randomUUID(),
+        type: 'rect',
+        x: 820,
+        y: 40,
+        width: 340,
+        height: 380,
+        fill: '#e8f4e8',
+        stroke: '#7cb342',
+        label: '🍳 Кухня и горячий цех',
+      },
+      {
+        id: crypto.randomUUID(),
+        type: 'rect',
+        x: 820,
+        y: 440,
+        width: 340,
+        height: 200,
+        fill: '#f4e8e8',
+        stroke: '#e57373',
+        label: '📦 Склад сырья',
+      },
+      {
+        id: crypto.randomUUID(),
+        type: 'rect',
+        x: 820,
+        y: 660,
+        width: 340,
+        height: 100,
+        fill: '#f3e5f5',
+        stroke: '#ab47bc',
+        label: '🚻 Санузел',
+      },
+      {
+        id: crypto.randomUUID(),
+        type: 'rect',
+        x: 80,
+        y: 80,
+        width: 220,
+        height: 120,
+        fill: '#fff3e0',
+        stroke: '#fb8c00',
+        label: '☕️ Барная зона',
+      },
+    ];
+
+    setShapes(tpl);
+    pushHistory(tpl);
     setSelectedId(null);
   }
 
-  // Обновление свойств выбранной фигуры
-  function updateSelected(patch: Partial<DrawingShape>) {
-    if (!selectedId) return;
-    setShapes((prev) =>
-      prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s))
-    );
-  }
-
-  // Обработка начала нажатия на холст
-  function handlePointerDown(e: React.PointerEvent) {
-    // Если клик был по ручке ресайза или по фигуре, эти обработчики вызовут e.stopPropagation()
+  // Обработчики мыши/тача на холсте
+  function handleCanvasPointerDown(e: React.PointerEvent) {
     const coords = getSvgCoords(e);
 
     if (tool === 'select') {
-      // Клик в пустоту снимает выделение
       setSelectedId(null);
       return;
     }
 
-    if (tool === 'rect') {
-      setDrawingState({
-        action: 'draw',
-        startX: coords.x,
-        startY: coords.y,
-        currentX: coords.x,
-        currentY: coords.y,
-      });
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } else if (tool === 'line') {
-      setDrawingState({
-        action: 'draw',
+    if (tool === 'rect' || tool === 'line') {
+      setActionState({
+        type: 'draw',
         startX: coords.x,
         startY: coords.y,
         currentX: coords.x,
@@ -134,11 +316,13 @@ export function FloorPlanEditor({
         type: 'text',
         x: coords.x,
         y: coords.y,
-        text: 'Текст',
+        text: 'Текстовая метка',
         fontSize: 16,
-        fill: '#333333',
+        fill: '#222222',
       };
-      setShapes((prev) => [...prev, newShape]);
+      const next = [...shapes, newShape];
+      setShapes(next);
+      pushHistory(next);
       setSelectedId(newShape.id);
       setTool('select');
     }
@@ -150,24 +334,22 @@ export function FloorPlanEditor({
     setSelectedId(shape.id);
 
     const coords = getSvgCoords(e);
-    setDrawingState({
-      action: 'move',
+    setActionState({
+      type: 'move',
       startX: coords.x,
       startY: coords.y,
       currentX: coords.x,
       currentY: coords.y,
       origShape: { ...shape },
     });
-    if (svgRef.current) {
-      svgRef.current.setPointerCapture(e.pointerId);
-    }
+    if (svgRef.current) svgRef.current.setPointerCapture(e.pointerId);
   }
 
   function handleResizeHandlePointerDown(e: React.PointerEvent, handle: HandleType, shape: DrawingShape) {
     e.stopPropagation();
     const coords = getSvgCoords(e);
-    setDrawingState({
-      action: 'resize',
+    setActionState({
+      type: 'resize',
       handle,
       startX: coords.x,
       startY: coords.y,
@@ -175,21 +357,19 @@ export function FloorPlanEditor({
       currentY: coords.y,
       origShape: { ...shape },
     });
-    if (svgRef.current) {
-      svgRef.current.setPointerCapture(e.pointerId);
-    }
+    if (svgRef.current) svgRef.current.setPointerCapture(e.pointerId);
   }
 
-  function handlePointerMove(e: React.PointerEvent) {
-    if (!drawingState) return;
+  function handleCanvasPointerMove(e: React.PointerEvent) {
+    if (!actionState) return;
     const coords = getSvgCoords(e);
 
-    if (drawingState.action === 'draw') {
-      setDrawingState((prev) => prev ? { ...prev, currentX: coords.x, currentY: coords.y } : null);
-    } else if (drawingState.action === 'move' && drawingState.origShape) {
-      const dx = coords.x - drawingState.startX;
-      const dy = coords.y - drawingState.startY;
-      const orig = drawingState.origShape;
+    if (actionState.type === 'draw') {
+      setActionState((prev) => (prev ? { ...prev, currentX: coords.x, currentY: coords.y } : null));
+    } else if (actionState.type === 'move' && actionState.origShape) {
+      const dx = coords.x - actionState.startX;
+      const dy = coords.y - actionState.startY;
+      const orig = actionState.origShape;
 
       if (orig.type === 'line') {
         const x2 = (orig.x2 ?? orig.x) + dx;
@@ -198,60 +378,74 @@ export function FloorPlanEditor({
       } else {
         updateSelected({ x: orig.x + dx, y: orig.y + dy });
       }
-    } else if (drawingState.action === 'resize' && drawingState.origShape && drawingState.handle) {
-      const orig = drawingState.origShape;
-      const origX = orig.x;
-      const origY = orig.y;
-      const origW = orig.width || 50;
-      const origH = orig.height || 50;
+    } else if (actionState.type === 'resize' && actionState.origShape && actionState.handle) {
+      const orig = actionState.origShape;
+      const ox = orig.x;
+      const oy = orig.y;
+      const ow = orig.width || 40;
+      const oh = orig.height || 40;
 
-      let newX = origX;
-      let newY = origY;
-      let newW = origW;
-      let newH = origH;
+      let nx = ox;
+      let ny = oy;
+      let nw = ow;
+      let nh = oh;
 
-      const dx = coords.x - drawingState.startX;
-      const dy = coords.y - drawingState.startY;
+      const dx = coords.x - actionState.startX;
+      const dy = coords.y - actionState.startY;
 
-      switch (drawingState.handle) {
+      switch (actionState.handle) {
         case 'se':
-          newW = Math.max(20, origW + dx);
-          newH = Math.max(20, origH + dy);
+          nw = Math.max(20, ow + dx);
+          nh = Math.max(20, oh + dy);
           break;
         case 'sw':
-          newW = Math.max(20, origW - dx);
-          newX = origX + (origW - newW);
-          newH = Math.max(20, origH + dy);
+          nw = Math.max(20, ow - dx);
+          nx = ox + (ow - nw);
+          nh = Math.max(20, oh + dy);
           break;
         case 'ne':
-          newW = Math.max(20, origW + dx);
-          newH = Math.max(20, origH - dy);
-          newY = origY + (origH - newH);
+          nw = Math.max(20, ow + dx);
+          nh = Math.max(20, oh - dy);
+          ny = oy + (oh - nh);
           break;
         case 'nw':
-          newW = Math.max(20, origW - dx);
-          newX = origX + (origW - newW);
-          newH = Math.max(20, origH - dy);
-          newY = origY + (origH - newH);
+          nw = Math.max(20, ow - dx);
+          nx = ox + (ow - nw);
+          nh = Math.max(20, oh - dy);
+          ny = oy + (oh - nh);
+          break;
+        case 'e':
+          nw = Math.max(20, ow + dx);
+          break;
+        case 'w':
+          nw = Math.max(20, ow - dx);
+          nx = ox + (ow - nw);
+          break;
+        case 's':
+          nh = Math.max(20, oh + dy);
+          break;
+        case 'n':
+          nh = Math.max(20, oh - dy);
+          ny = oy + (oh - nh);
           break;
       }
 
-      updateSelected({ x: newX, y: newY, width: newW, height: newH });
+      updateSelected({ x: nx, y: ny, width: nw, height: nh });
     }
   }
 
-  function handlePointerUp(e: React.PointerEvent) {
-    if (!drawingState) return;
+  function handleCanvasPointerUp(e: React.PointerEvent) {
+    if (!actionState) return;
 
-    if (drawingState.action === 'draw') {
+    if (actionState.type === 'draw') {
       const coords = getSvgCoords(e);
       if (tool === 'rect') {
-        const x = Math.min(drawingState.startX, coords.x);
-        const y = Math.min(drawingState.startY, coords.y);
-        const width = Math.abs(coords.x - drawingState.startX);
-        const height = Math.abs(coords.y - drawingState.startY);
+        const x = Math.min(actionState.startX, coords.x);
+        const y = Math.min(actionState.startY, coords.y);
+        const width = Math.abs(coords.x - actionState.startX);
+        const height = Math.abs(coords.y - actionState.startY);
 
-        if (width >= 10 && height >= 10) {
+        if (width >= 20 && height >= 20) {
           const newRect: DrawingShape = {
             id: crypto.randomUUID(),
             type: 'rect',
@@ -263,34 +457,41 @@ export function FloorPlanEditor({
             stroke: activeColor.stroke,
             label: '',
           };
-          setShapes((prev) => [...prev, newRect]);
+          const next = [...shapes, newRect];
+          setShapes(next);
+          pushHistory(next);
           setSelectedId(newRect.id);
           setTool('select');
         }
       } else if (tool === 'line') {
-        const len = Math.hypot(coords.x - drawingState.startX, coords.y - drawingState.startY);
-        if (len >= 10) {
+        const len = Math.hypot(coords.x - actionState.startX, coords.y - actionState.startY);
+        if (len >= 20) {
           const newLine: DrawingShape = {
             id: crypto.randomUUID(),
             type: 'line',
-            x: drawingState.startX,
-            y: drawingState.startY,
+            x: actionState.startX,
+            y: actionState.startY,
             x2: coords.x,
             y2: coords.y,
             stroke: '#444444',
           };
-          setShapes((prev) => [...prev, newLine]);
+          const next = [...shapes, newLine];
+          setShapes(next);
+          pushHistory(next);
           setSelectedId(newLine.id);
           setTool('select');
         }
       }
+    } else if (actionState.type === 'move' || actionState.type === 'resize') {
+      // Сохраняем итоговое состояние в историю
+      pushHistory(shapes);
     }
 
     try {
       if (svgRef.current) svgRef.current.releasePointerCapture(e.pointerId);
     } catch { /* игнор */ }
 
-    setDrawingState(null);
+    setActionState(null);
   }
 
   async function handleSave() {
@@ -322,6 +523,14 @@ export function FloorPlanEditor({
     }
   }
 
+  // Расчет размеров временного прямоугольника при рисовании
+  const activeRectPreview = actionState?.type === 'draw' && tool === 'rect' ? {
+    x: Math.min(actionState.startX, actionState.currentX),
+    y: Math.min(actionState.startY, actionState.currentY),
+    w: Math.abs(actionState.currentX - actionState.startX),
+    h: Math.abs(actionState.currentY - actionState.startY),
+  } : null;
+
   return (
     <div className="drawing-editor-modal">
       <div className="drawing-editor-wrap">
@@ -335,9 +544,43 @@ export function FloorPlanEditor({
               onChange={(e) => setName(e.target.value)}
               required
             />
+            <button
+              type="button"
+              className="btn btn--sm"
+              onClick={loadStarterTemplate}
+              title="Загрузить типовой шаблон ресторана"
+            >
+              📋 Шаблон
+            </button>
           </div>
 
           <div className="drawing-editor-head__right">
+            <button
+              type="button"
+              className="btn btn--sm btn--icon"
+              onClick={undo}
+              disabled={historyIndex <= 0}
+              title="Отменить действие (Ctrl+Z)"
+            >
+              ↩
+            </button>
+            <button
+              type="button"
+              className="btn btn--sm btn--icon"
+              onClick={redo}
+              disabled={historyIndex >= history.length - 1}
+              title="Повторить действие (Ctrl+Y)"
+            >
+              ↪
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm ${snapToGrid ? 'btn--primary' : ''}`}
+              onClick={() => setSnapToGrid((v) => !v)}
+              title="Привязка к сетке (20px)"
+            >
+              🧲 Сетка
+            </button>
             <button type="button" className="btn btn--sm" onClick={onClose} disabled={saving}>
               ✕ Отмена
             </button>
@@ -354,14 +597,14 @@ export function FloorPlanEditor({
 
         {error && <div className="banner banner--error" style={{ margin: '8px 14px' }}>{error}</div>}
 
-        {/* Тулбар инструментов */}
+        {/* Главный тулбар инструментов */}
         <div className="drawing-toolbar">
           <div className="drawing-toolbar__group">
             <button
               type="button"
               className={`drawing-toolbar__btn ${tool === 'select' ? 'is-active' : ''}`}
               onClick={() => setTool('select')}
-              title="Выделение и перемещение (V)"
+              title="Выделение, перемещение и ресайз (V или 1)"
             >
               <span>↖</span> Выделение
             </button>
@@ -369,7 +612,7 @@ export function FloorPlanEditor({
               type="button"
               className={`drawing-toolbar__btn ${tool === 'rect' ? 'is-active' : ''}`}
               onClick={() => setTool('rect')}
-              title="Прямоугольная зона (R)"
+              title="Прямоугольная комната / зона (R или 2)"
             >
               <span>▭</span> Зона (комната)
             </button>
@@ -377,7 +620,7 @@ export function FloorPlanEditor({
               type="button"
               className={`drawing-toolbar__btn ${tool === 'line' ? 'is-active' : ''}`}
               onClick={() => setTool('line')}
-              title="Линия / стена (L)"
+              title="Стена / перегородка (L или 3)"
             >
               <span>—</span> Стена
             </button>
@@ -385,29 +628,28 @@ export function FloorPlanEditor({
               type="button"
               className={`drawing-toolbar__btn ${tool === 'text' ? 'is-active' : ''}`}
               onClick={() => setTool('text')}
-              title="Текстовая подпись (T)"
+              title="Текстовая подпись (T или 4)"
             >
               <span>T</span> Текст
             </button>
           </div>
 
-          {/* Палитра цветов для зон */}
-          <div className="drawing-toolbar__group drawing-color-picker">
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Цвет:</span>
-            {PRESET_COLORS.map((c, i) => (
+          {/* Быстрые пресеты комнат (1-клик раскраска и подпись) */}
+          <div className="drawing-presets-scroll">
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+              Пресеты зон:
+            </span>
+            {ROOM_PRESETS.map((p, idx) => (
               <button
-                key={i}
+                key={idx}
                 type="button"
-                className={`drawing-color-swatch ${activeColor.fill === c.fill ? 'is-active' : ''}`}
-                style={{ background: c.fill, borderColor: c.stroke }}
-                title={c.name}
-                onClick={() => {
-                  setActiveColor(c);
-                  if (selectedShape && selectedShape.type === 'rect') {
-                    updateSelected({ fill: c.fill, stroke: c.stroke });
-                  }
-                }}
-              />
+                className="drawing-preset-chip"
+                style={{ background: p.fill, borderColor: p.stroke }}
+                onClick={() => applyPreset(p)}
+                title={`Применить к выбранной зоне: ${p.label}`}
+              >
+                <span>{p.icon}</span> {p.label}
+              </button>
             ))}
           </div>
 
@@ -417,7 +659,7 @@ export function FloorPlanEditor({
                 type="button"
                 className="btn btn--sm btn--danger btn--icon"
                 onClick={deleteSelected}
-                title="Удалить выбранный элемент (Delete)"
+                title="Удалить выбранный элемент (Delete / Backspace)"
               >
                 🗑
               </button>
@@ -425,7 +667,7 @@ export function FloorPlanEditor({
           )}
         </div>
 
-        {/* Панель свойств выбранной фигуры (инспектор) */}
+        {/* Панель параметров выбранной фигуры (инспектор) */}
         {selectedShape && (
           <div className="drawing-inspector">
             {selectedShape.type === 'rect' && (
@@ -433,211 +675,347 @@ export function FloorPlanEditor({
                 <span className="drawing-inspector__label">Подпись зоны:</span>
                 <input
                   className="input input--sm"
-                  placeholder="Например: Кухня, Зал, Склад…"
+                  placeholder="Например: 🍳 Кухня, 🍽 Зал №1…"
                   value={selectedShape.label || ''}
-                  onChange={(e) => updateSelected({ label: e.target.value })}
-                  autoFocus
+                  onChange={(e) => updateSelected({ label: e.target.value }, true)}
+                  style={{ maxWidth: 280 }}
                 />
+                <span className="drawing-inspector__label" style={{ marginLeft: 12 }}>Цвет заливки:</span>
+                <div className="drawing-color-picker">
+                  {PRESET_COLORS.map((c, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`drawing-color-swatch ${selectedShape.fill === c.fill ? 'is-active' : ''}`}
+                      style={{ background: c.fill, borderColor: c.stroke }}
+                      title={c.name}
+                      onClick={() => updateSelected({ fill: c.fill, stroke: c.stroke }, true)}
+                    />
+                  ))}
+                </div>
               </div>
             )}
+
             {selectedShape.type === 'text' && (
               <div className="drawing-inspector__row">
                 <span className="drawing-inspector__label">Текст:</span>
                 <input
                   className="input input--sm"
                   value={selectedShape.text || ''}
-                  onChange={(e) => updateSelected({ text: e.target.value })}
-                  autoFocus
+                  onChange={(e) => updateSelected({ text: e.target.value }, true)}
+                  style={{ maxWidth: 300 }}
                 />
+                <span className="drawing-inspector__label" style={{ marginLeft: 12 }}>Размер:</span>
                 <select
                   className="select select--sm"
                   value={selectedShape.fontSize || 16}
-                  onChange={(e) => updateSelected({ fontSize: Number(e.target.value) })}
-                  style={{ width: 80 }}
+                  onChange={(e) => updateSelected({ fontSize: Number(e.target.value) }, true)}
+                  style={{ width: 90 }}
                 >
-                  <option value={12}>12px</option>
-                  <option value={14}>14px</option>
-                  <option value={16}>16px</option>
-                  <option value={20}>20px</option>
-                  <option value={24}>24px</option>
+                  <option value={12}>12 px</option>
+                  <option value={14}>14 px</option>
+                  <option value={16}>16 px</option>
+                  <option value={20}>20 px</option>
+                  <option value={24}>24 px</option>
+                  <option value={32}>32 px</option>
                 </select>
+              </div>
+            )}
+
+            {selectedShape.type === 'line' && (
+              <div className="drawing-inspector__row">
+                <span className="drawing-inspector__label">Толщина стены:</span>
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => updateSelected({ stroke: '#222222' }, true)}
+                >
+                  Черная
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => updateSelected({ stroke: '#9e9e9e' }, true)}
+                >
+                  Серая
+                </button>
               </div>
             )}
           </div>
         )}
 
-        {/* Холст SVG */}
-        <div className="drawing-canvas-viewport">
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
-            className="drawing-svg-canvas"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
+        {/* Холст SVG с зумом и сеткой */}
+        <div className="drawing-canvas-viewport" ref={viewportRef}>
+          {/* Плавающий зум */}
+          <div className="floor-plan-zoom-bar">
+            <button
+              type="button"
+              className="btn btn--sm btn--icon"
+              onClick={() => setZoom((z) => Math.min(2.5, z + 0.2))}
+              title="Увеличить"
+            >
+              +
+            </button>
+            <span className="floor-plan-zoom-val">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              className="btn btn--sm btn--icon"
+              onClick={() => setZoom((z) => Math.max(0.4, z - 0.2))}
+              title="Уменьшить"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className="btn btn--sm btn--icon"
+              onClick={() => { setZoom(1); setEditorPan({ x: 0, y: 0 }); }}
+              title="Сбросить масштаб"
+            >
+              ↺
+            </button>
+          </div>
+
+          <div
+            className="drawing-canvas-stage"
+            style={{
+              transform: `translate(${editorPan.x}px, ${editorPan.y}px) scale(${zoom})`,
+              transformOrigin: 'center center',
+              transition: actionState ? 'none' : 'transform 0.15s ease',
+            }}
           >
-            {/* Фоновая сетка */}
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="1" />
-              </pattern>
-            </defs>
-            <rect width={canvasWidth} height={canvasHeight} fill="url(#grid)" />
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+              className="drawing-svg-canvas"
+              onPointerDown={handleCanvasPointerDown}
+              onPointerMove={handleCanvasPointerMove}
+              onPointerUp={handleCanvasPointerUp}
+              style={{ cursor: tool === 'select' ? (selectedShape ? 'default' : 'default') : 'crosshair' }}
+            >
+              {/* Фоновая сетка */}
+              <defs>
+                <pattern id="editor-grid-small" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="1" />
+                </pattern>
+                <pattern id="editor-grid-large" width="100" height="100" patternUnits="userSpaceOnUse">
+                  <rect width="100" height="100" fill="url(#editor-grid-small)" />
+                  <path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth="1.5" />
+                </pattern>
+                {/* Мягкая тень для комнат */}
+                <filter id="room-shadow" x="-5%" y="-5%" width="110%" height="110%">
+                  <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.08" />
+                </filter>
+              </defs>
 
-            {/* Фигуры */}
-            {shapes.map((shape) => {
-              const isSelected = shape.id === selectedId;
+              <rect width={canvasWidth} height={canvasHeight} fill="url(#editor-grid-large)" />
 
-              if (shape.type === 'rect') {
-                const w = shape.width || 40;
-                const h = shape.height || 40;
-                return (
-                  <g
-                    key={shape.id}
-                    onPointerDown={(e) => handleShapePointerDown(e, shape)}
-                    style={{ cursor: tool === 'select' ? 'move' : 'crosshair' }}
-                  >
-                    <rect
-                      x={shape.x}
-                      y={shape.y}
-                      width={w}
-                      height={h}
-                      fill={shape.fill || '#f4f4f4'}
-                      stroke={isSelected ? 'var(--accent)' : shape.stroke || '#999'}
-                      strokeWidth={isSelected ? 3 : 2}
-                      rx={4}
-                    />
-                    {shape.label && (
-                      <text
-                        x={shape.x + w / 2}
-                        y={shape.y + h / 2}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="#222222"
-                        fontSize={14}
-                        fontWeight={700}
-                        style={{ pointerEvents: 'none', userSelect: 'none' }}
-                      >
-                        {shape.label}
-                      </text>
-                    )}
+              {/* Нарисованные фигуры */}
+              {shapes.map((shape) => {
+                const isSelected = shape.id === selectedId;
 
-                    {/* Ручки ресайза для выбранного прямоугольника */}
-                    {isSelected && tool === 'select' && (
-                      <g className="drawing-handles">
-                        <circle
-                          cx={shape.x}
-                          cy={shape.y}
-                          r={6}
-                          className="drawing-handle"
-                          onPointerDown={(e) => handleResizeHandlePointerDown(e, 'nw', shape)}
-                          style={{ cursor: 'nwse-resize' }}
-                        />
-                        <circle
-                          cx={shape.x + w}
-                          cy={shape.y}
-                          r={6}
-                          className="drawing-handle"
-                          onPointerDown={(e) => handleResizeHandlePointerDown(e, 'ne', shape)}
-                          style={{ cursor: 'nesw-resize' }}
-                        />
-                        <circle
-                          cx={shape.x + w}
-                          cy={shape.y + h}
-                          r={6}
-                          className="drawing-handle"
-                          onPointerDown={(e) => handleResizeHandlePointerDown(e, 'se', shape)}
-                          style={{ cursor: 'nwse-resize' }}
-                        />
-                        <circle
-                          cx={shape.x}
-                          cy={shape.y + h}
-                          r={6}
-                          className="drawing-handle"
-                          onPointerDown={(e) => handleResizeHandlePointerDown(e, 'sw', shape)}
-                          style={{ cursor: 'nesw-resize' }}
-                        />
-                      </g>
-                    )}
-                  </g>
-                );
-              }
-
-              if (shape.type === 'line') {
-                return (
-                  <g
-                    key={shape.id}
-                    onPointerDown={(e) => handleShapePointerDown(e, shape)}
-                    style={{ cursor: tool === 'select' ? 'move' : 'crosshair' }}
-                  >
-                    <line
-                      x1={shape.x}
-                      y1={shape.y}
-                      x2={shape.x2 ?? shape.x + 40}
-                      y2={shape.y2 ?? shape.y}
-                      stroke={isSelected ? 'var(--accent)' : shape.stroke || '#444'}
-                      strokeWidth={isSelected ? 4 : 3}
-                      strokeLinecap="round"
-                    />
-                  </g>
-                );
-              }
-
-              if (shape.type === 'text') {
-                return (
-                  <g
-                    key={shape.id}
-                    onPointerDown={(e) => handleShapePointerDown(e, shape)}
-                    style={{ cursor: tool === 'select' ? 'move' : 'crosshair' }}
-                  >
-                    <text
-                      x={shape.x}
-                      y={shape.y}
-                      fill={isSelected ? 'var(--accent)' : shape.fill || '#222'}
-                      fontSize={shape.fontSize || 16}
-                      fontWeight={600}
-                      style={{ userSelect: 'none' }}
+                if (shape.type === 'rect') {
+                  const w = shape.width || 40;
+                  const h = shape.height || 40;
+                  return (
+                    <g
+                      key={shape.id}
+                      onPointerDown={(e) => handleShapePointerDown(e, shape)}
+                      style={{ cursor: tool === 'select' ? 'move' : 'crosshair' }}
                     >
-                      {shape.text || 'Текст'}
-                    </text>
-                  </g>
-                );
-              }
+                      <rect
+                        x={shape.x}
+                        y={shape.y}
+                        width={w}
+                        height={h}
+                        fill={shape.fill || '#f4f4f4'}
+                        stroke={isSelected ? 'var(--accent)' : shape.stroke || '#78909c'}
+                        strokeWidth={isSelected ? 3 : 2}
+                        rx={6}
+                        filter="url(#room-shadow)"
+                      />
+                      {shape.label && (
+                        <text
+                          x={shape.x + w / 2}
+                          y={shape.y + h / 2}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          fill="#1e293b"
+                          fontSize={Math.min(18, Math.max(12, Math.round(w / 14)))}
+                          fontWeight={700}
+                          style={{ pointerEvents: 'none', userSelect: 'none' }}
+                        >
+                          {shape.label}
+                        </text>
+                      )}
 
-              return null;
-            })}
+                      {/* Ручки ресайза для выбранного прямоугольника */}
+                      {isSelected && tool === 'select' && (
+                        <g className="drawing-handles">
+                          {/* Углы */}
+                          <circle
+                            cx={shape.x}
+                            cy={shape.y}
+                            r={6}
+                            className="drawing-handle"
+                            onPointerDown={(e) => handleResizeHandlePointerDown(e, 'nw', shape)}
+                            style={{ cursor: 'nwse-resize' }}
+                          />
+                          <circle
+                            cx={shape.x + w}
+                            cy={shape.y}
+                            r={6}
+                            className="drawing-handle"
+                            onPointerDown={(e) => handleResizeHandlePointerDown(e, 'ne', shape)}
+                            style={{ cursor: 'nesw-resize' }}
+                          />
+                          <circle
+                            cx={shape.x + w}
+                            cy={shape.y + h}
+                            r={6}
+                            className="drawing-handle"
+                            onPointerDown={(e) => handleResizeHandlePointerDown(e, 'se', shape)}
+                            style={{ cursor: 'nwse-resize' }}
+                          />
+                          <circle
+                            cx={shape.x}
+                            cy={shape.y + h}
+                            r={6}
+                            className="drawing-handle"
+                            onPointerDown={(e) => handleResizeHandlePointerDown(e, 'sw', shape)}
+                            style={{ cursor: 'nesw-resize' }}
+                          />
+                          {/* Стороны */}
+                          <circle
+                            cx={shape.x + w / 2}
+                            cy={shape.y}
+                            r={5}
+                            className="drawing-handle"
+                            onPointerDown={(e) => handleResizeHandlePointerDown(e, 'n', shape)}
+                            style={{ cursor: 'ns-resize' }}
+                          />
+                          <circle
+                            cx={shape.x + w / 2}
+                            cy={shape.y + h}
+                            r={5}
+                            className="drawing-handle"
+                            onPointerDown={(e) => handleResizeHandlePointerDown(e, 's', shape)}
+                            style={{ cursor: 'ns-resize' }}
+                          />
+                          <circle
+                            cx={shape.x}
+                            cy={shape.y + h / 2}
+                            r={5}
+                            className="drawing-handle"
+                            onPointerDown={(e) => handleResizeHandlePointerDown(e, 'w', shape)}
+                            style={{ cursor: 'ew-resize' }}
+                          />
+                          <circle
+                            cx={shape.x + w}
+                            cy={shape.y + h / 2}
+                            r={5}
+                            className="drawing-handle"
+                            onPointerDown={(e) => handleResizeHandlePointerDown(e, 'e', shape)}
+                            style={{ cursor: 'ew-resize' }}
+                          />
+                        </g>
+                      )}
+                    </g>
+                  );
+                }
 
-            {/* Временная фигура во время рисования */}
-            {drawingState?.action === 'draw' && (
-              <>
-                {tool === 'rect' && (
+                if (shape.type === 'line') {
+                  return (
+                    <g
+                      key={shape.id}
+                      onPointerDown={(e) => handleShapePointerDown(e, shape)}
+                      style={{ cursor: tool === 'select' ? 'move' : 'crosshair' }}
+                    >
+                      <line
+                        x1={shape.x}
+                        y1={shape.y}
+                        x2={shape.x2 ?? shape.x + 40}
+                        y2={shape.y2 ?? shape.y}
+                        stroke={isSelected ? 'var(--accent)' : shape.stroke || '#333333'}
+                        strokeWidth={isSelected ? 5 : 4}
+                        strokeLinecap="round"
+                      />
+                    </g>
+                  );
+                }
+
+                if (shape.type === 'text') {
+                  return (
+                    <g
+                      key={shape.id}
+                      onPointerDown={(e) => handleShapePointerDown(e, shape)}
+                      style={{ cursor: tool === 'select' ? 'move' : 'crosshair' }}
+                    >
+                      <text
+                        x={shape.x}
+                        y={shape.y}
+                        fill={isSelected ? 'var(--accent)' : shape.fill || '#1e293b'}
+                        fontSize={shape.fontSize || 16}
+                        fontWeight={700}
+                        style={{ userSelect: 'none' }}
+                      >
+                        {shape.text || 'Метка'}
+                      </text>
+                    </g>
+                  );
+                }
+
+                return null;
+              })}
+
+              {/* Превью во время активного рисования */}
+              {activeRectPreview && (
+                <g>
                   <rect
-                    x={Math.min(drawingState.startX, drawingState.currentX)}
-                    y={Math.min(drawingState.startY, drawingState.currentY)}
-                    width={Math.abs(drawingState.currentX - drawingState.startX)}
-                    height={Math.abs(drawingState.currentY - drawingState.startY)}
+                    x={activeRectPreview.x}
+                    y={activeRectPreview.y}
+                    width={activeRectPreview.w}
+                    height={activeRectPreview.h}
                     fill={activeColor.fill}
                     stroke={activeColor.stroke}
                     strokeWidth={2}
-                    strokeDasharray="4 4"
+                    strokeDasharray="5 5"
+                    rx={6}
+                  />
+                  <rect
+                    x={activeRectPreview.x + activeRectPreview.w / 2 - 35}
+                    y={activeRectPreview.y + activeRectPreview.h / 2 - 12}
+                    width={70}
+                    height={24}
                     rx={4}
+                    fill="rgba(0,0,0,0.75)"
                   />
-                )}
-                {tool === 'line' && (
-                  <line
-                    x1={drawingState.startX}
-                    y1={drawingState.startY}
-                    x2={drawingState.currentX}
-                    y2={drawingState.currentY}
-                    stroke="#444"
-                    strokeWidth={3}
-                    strokeDasharray="4 4"
-                    strokeLinecap="round"
-                  />
-                )}
-              </>
-            )}
-          </svg>
+                  <text
+                    x={activeRectPreview.x + activeRectPreview.w / 2}
+                    y={activeRectPreview.y + activeRectPreview.h / 2 + 4}
+                    textAnchor="middle"
+                    fill="#ffffff"
+                    fontSize={11}
+                    fontWeight={600}
+                  >
+                    {activeRectPreview.w} × {activeRectPreview.h}
+                  </text>
+                </g>
+              )}
+
+              {actionState?.type === 'draw' && tool === 'line' && (
+                <line
+                  x1={actionState.startX}
+                  y1={actionState.startY}
+                  x2={actionState.currentX}
+                  y2={actionState.currentY}
+                  stroke="#333333"
+                  strokeWidth={4}
+                  strokeDasharray="4 4"
+                  strokeLinecap="round"
+                />
+              )}
+            </svg>
+          </div>
         </div>
       </div>
     </div>

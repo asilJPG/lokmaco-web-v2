@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Asset, AssetFloorPlan, AssetLocation, AssetTag, DrawingData } from '@/db/schema';
-import { baseInvNumber, unitLabel } from '@/lib/inv-number';
 import { STATUS } from './asset-modals';
 import { InventoryScanModal } from './inventory-scan';
 import { FloorPlanEditor } from './floor-plan-editor';
@@ -35,17 +34,22 @@ export function FloorPlanView({
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Режим работы: 'view' (просмотр и инфо), 'place' (ручное размещение/drag)
+  // Режим работы: 'view' (просмотр и инфо), 'place' (размещение/перетаскивание)
   const [mode, setMode] = useState<'view' | 'place'>('view');
   const [showChoiceModal, setShowChoiceModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [editorMode, setEditorMode] = useState<'create' | 'edit' | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
 
-  // Выбранное оборудование для размещения на карте (после клика в списке или после QR скана)
+  // Выбранное оборудование для размещения на карте (через клик в списке)
   const [pendingAsset, setPendingAsset] = useState<Asset | null>(null);
   // Выбранный маркер для просмотра деталей
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  // Оптимистичные локальные оверрайды: instant UI updates без ожидания сети
+  const [localOverrides, setLocalOverrides] = useState<
+    Map<string, { floorPlanId: string | null; x: number | null; y: number | null }>
+  >(new Map());
 
   // Зум и панорамирование
   const [zoom, setZoom] = useState(1);
@@ -53,12 +57,21 @@ export function FloorPlanView({
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
-  // Перетаскивание маркера по карте
-  const [draggingAssetId, setDraggingAssetId] = useState<string | null>(null);
+  // Живое перетаскивание маркера (плавное движение за пальцем/курсором)
+  const [dragState, setDragState] = useState<{
+    assetId: string;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+
+  // Состояние наведения Drag & Drop из бокового списка
+  const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
+
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapCanvasRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
 
-  // Поиск и фильтр в боковой панели непривязанного оборудования
+  // Поиск и фильтр в боковой панели
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [sidebarLocation, setSidebarLocation] = useState('all');
 
@@ -95,18 +108,36 @@ export function FloorPlanView({
     [plans, activePlanId]
   );
 
+  // Слияние основных данных с локальными оверрайдами (для моментальной отзывчивости)
+  const effectiveAssets: Asset[] = useMemo(() => {
+    return assets.map((a) => {
+      const override = localOverrides.get(a.id);
+      if (!override) return a;
+      return {
+        ...a,
+        floorPlanId: override.floorPlanId,
+        floorPlanX: override.x !== null ? String(override.x) : null,
+        floorPlanY: override.y !== null ? String(override.y) : null,
+      };
+    });
+  }, [assets, localOverrides]);
+
   // Оборудование, привязанное к текущему активному плану
   const pinnedAssets = useMemo(() => {
     if (!activePlan) return [];
-    return assets.filter(
-      (a) => a.floorPlanId === activePlan.id && a.floorPlanX !== null && a.floorPlanY !== null && a.status !== 'archived'
+    return effectiveAssets.filter(
+      (a) =>
+        a.floorPlanId === activePlan.id &&
+        a.floorPlanX !== null &&
+        a.floorPlanY !== null &&
+        a.status !== 'archived'
     );
-  }, [assets, activePlan]);
+  }, [effectiveAssets, activePlan]);
 
   // Непривязанное к этому плану оборудование
   const unplacedAssets = useMemo(() => {
     const q = sidebarSearch.trim().toLowerCase();
-    return assets.filter((a) => {
+    return effectiveAssets.filter((a) => {
       if (a.status === 'archived') return false;
       if (a.floorPlanId === activePlanId) return false;
       if (sidebarLocation !== 'all' && a.locationId !== sidebarLocation) return false;
@@ -114,65 +145,139 @@ export function FloorPlanView({
       return [a.name, a.invNumber, a.serialNumber, tagByAsset.get(a.id)]
         .some((v) => (v || '').toLowerCase().includes(q));
     });
-  }, [assets, activePlanId, sidebarLocation, sidebarSearch, tagByAsset]);
+  }, [effectiveAssets, activePlanId, sidebarLocation, sidebarSearch, tagByAsset]);
 
-  // Сброс зума при переключении плана
+  const selectedAsset = useMemo(() => {
+    if (!selectedAssetId) return null;
+    return effectiveAssets.find((a) => a.id === selectedAssetId) || null;
+  }, [effectiveAssets, selectedAssetId]);
+
+  // Сброс зума и панорамы при переключении плана
   useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
-    setSelectedAsset(null);
+    setSelectedAssetId(null);
     setPendingAsset(null);
+    setDragState(null);
   }, [activePlanId]);
 
-  // Привязка оборудования к координатам
-  async function pinAsset(assetId: string, x: number, y: number) {
-    if (!activePlan) return;
-    try {
-      const res = await fetch('/api/assets/pin', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assetId,
-          floorPlanId: activePlan.id,
-          x,
-          y,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setMsg({ ok: false, text: json.error || 'Ошибка привязки' });
-        return;
-      }
-      setMsg({ ok: true, text: 'Оборудование размещено на карте' });
-      setPendingAsset(null);
-      await onRefresh();
-      await loadPlans();
-    } catch {
-      setMsg({ ok: false, text: 'Сетевая ошибка' });
-    }
-  }
+  // Автоматическое вписывание плана в экран (Fit to Screen)
+  const autoFit = useCallback(() => {
+    if (!mapContainerRef.current || !activePlan) return;
+    const container = mapContainerRef.current;
+    const cw = container.clientWidth - 48;
+    const ch = container.clientHeight - 48;
+    const pw = activePlan.width > 0 ? activePlan.width : 1200;
+    const ph = activePlan.height > 0 ? activePlan.height : 800;
 
-  // Отвязка оборудования от карты
-  async function unpinAsset(assetId: string) {
-    try {
-      const res = await fetch('/api/assets/pin', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assetId, floorPlanId: null }),
+    if (cw <= 0 || ch <= 0 || pw <= 0 || ph <= 0) return;
+
+    const scale = Math.min(cw / pw, ch / ph, 1.2);
+    const z = Math.max(0.3, Math.min(2.5, Math.round(scale * 100) / 100));
+    setZoom(z);
+
+    // Центрируем
+    const offsetX = Math.round((container.clientWidth - pw * z) / 2);
+    const offsetY = Math.round((container.clientHeight - ph * z) / 2);
+    setPan({ x: Math.max(0, offsetX), y: Math.max(0, offsetY) });
+  }, [activePlan]);
+
+  // Мгновенная оптимистичная привязка оборудования к координатам (0..1)
+  const pinAsset = useCallback(
+    async (assetId: string, x: number, y: number) => {
+      if (!activePlan) return;
+
+      // 1. Моментальное обновление UI
+      setLocalOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(assetId, { floorPlanId: activePlan.id, x, y });
+        return next;
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setMsg({ ok: false, text: json.error || 'Ошибка снятия с карты' });
-        return;
+      setPendingAsset(null);
+      setMsg({ ok: true, text: 'Маркер установлен на карте' });
+
+      // 2. Фоновый запрос к серверу
+      try {
+        const res = await fetch('/api/assets/pin', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assetId,
+            floorPlanId: activePlan.id,
+            x,
+            y,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          // Откат при ошибке
+          setLocalOverrides((prev) => {
+            const next = new Map(prev);
+            next.delete(assetId);
+            return next;
+          });
+          setMsg({ ok: false, text: json.error || 'Ошибка привязки' });
+          return;
+        }
+
+        // Тихая фоновая синхронизация
+        onRefresh();
+        loadPlans();
+      } catch {
+        setLocalOverrides((prev) => {
+          const next = new Map(prev);
+          next.delete(assetId);
+          return next;
+        });
+        setMsg({ ok: false, text: 'Сетевая ошибка' });
       }
-      setMsg({ ok: true, text: 'Маркер снят с карты' });
-      setSelectedAsset(null);
-      await onRefresh();
-      await loadPlans();
-    } catch {
-      setMsg({ ok: false, text: 'Сетевая ошибка' });
-    }
-  }
+    },
+    [activePlan, onRefresh, loadPlans]
+  );
+
+  // Мгновенное снятие оборудования с карты
+  const unpinAsset = useCallback(
+    async (assetId: string) => {
+      // 1. Оптимистичный откат в UI
+      setLocalOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(assetId, { floorPlanId: null, x: null, y: null });
+        return next;
+      });
+      setSelectedAssetId(null);
+      setMsg({ ok: true, text: 'Оборудование снято с карты' });
+
+      // 2. Фоновый запрос к серверу
+      try {
+        const res = await fetch('/api/assets/pin', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetId, floorPlanId: null }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setLocalOverrides((prev) => {
+            const next = new Map(prev);
+            next.delete(assetId);
+            return next;
+          });
+          setMsg({ ok: false, text: json.error || 'Ошибка снятия с карты' });
+          return;
+        }
+
+        onRefresh();
+        loadPlans();
+      } catch {
+        setLocalOverrides((prev) => {
+          const next = new Map(prev);
+          next.delete(assetId);
+          return next;
+        });
+        setMsg({ ok: false, text: 'Сетевая ошибка' });
+      }
+    },
+    [onRefresh, loadPlans]
+  );
 
   // Удаление плана
   async function deleteCurrentPlan() {
@@ -197,7 +302,6 @@ export function FloorPlanView({
   // Сохранение нарисованной схемы из редактора
   async function handleSaveDrawing({ name, drawingData }: { name: string; drawingData: DrawingData }) {
     if (editorMode === 'edit' && activePlan) {
-      // Обновление существующей схемы
       const res = await fetch(`/api/assets/floor-plans/${activePlan.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -207,14 +311,12 @@ export function FloorPlanView({
         }),
       });
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || 'Ошибка обновления схемы');
-      }
+      if (!res.ok) throw new Error(json.error || 'Ошибка обновления схемы');
+
       setEditorMode(null);
       setMsg({ ok: true, text: `Схема «${name}» обновлена` });
       await loadPlans();
     } else {
-      // Создание новой схемы
       const res = await fetch('/api/assets/floor-plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -225,9 +327,8 @@ export function FloorPlanView({
         }),
       });
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || 'Ошибка сохранения схемы');
-      }
+      if (!res.ok) throw new Error(json.error || 'Ошибка сохранения схемы');
+
       setEditorMode(null);
       setPlans((prev) => [json.data, ...prev]);
       setActivePlanId(json.data.id);
@@ -236,7 +337,7 @@ export function FloorPlanView({
     }
   }
 
-  // Обработка клика по карте для установки маркера
+  // Клик по карте для установки выбранного маркера
   function handleMapClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!pendingAsset || !mapCanvasRef.current) return;
     const rect = mapCanvasRef.current.getBoundingClientRect();
@@ -245,9 +346,7 @@ export function FloorPlanView({
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    if (clickX < 0 || clickX > rect.width || clickY < 0 || clickY > rect.height) {
-      return;
-    }
+    if (clickX < 0 || clickX > rect.width || clickY < 0 || clickY > rect.height) return;
 
     const x = Math.max(0, Math.min(1, clickX / rect.width));
     const y = Math.max(0, Math.min(1, clickY / rect.height));
@@ -255,9 +354,40 @@ export function FloorPlanView({
     pinAsset(pendingAsset.id, x, y);
   }
 
-  // Начало панорамирования (перемещение карты мышью/пальцем)
+  // Drag-and-Drop из боковой панели напрямую на холст плана
+  function handleCanvasDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!isDragOverCanvas) setIsDragOverCanvas(true);
+  }
+
+  function handleCanvasDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragOverCanvas(false);
+  }
+
+  function handleCanvasDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsDragOverCanvas(false);
+
+    const assetId = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('application/asset-id');
+    if (!assetId || !mapCanvasRef.current) return;
+
+    const rect = mapCanvasRef.current.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    const dropX = e.clientX - rect.left;
+    const dropY = e.clientY - rect.top;
+
+    const x = Math.max(0, Math.min(1, dropX / rect.width));
+    const y = Math.max(0, Math.min(1, dropY / rect.height));
+
+    pinAsset(assetId, x, y);
+  }
+
+  // Панорамирование карты мышью или тачем
   function handleMapPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (draggingAssetId || pendingAsset) return;
+    if (dragState || pendingAsset) return;
     if ((e.target as HTMLElement).closest('.map-pin')) return;
 
     setIsPanning(true);
@@ -271,74 +401,109 @@ export function FloorPlanView({
   }
 
   function handleMapPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (dragState && mapCanvasRef.current) {
+      const rect = mapCanvasRef.current.getBoundingClientRect();
+      const dropX = e.clientX - rect.left;
+      const dropY = e.clientY - rect.top;
+      const x = Math.max(0, Math.min(1, dropX / rect.width));
+      const y = Math.max(0, Math.min(1, dropY / rect.height));
+
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        setDragState((prev) => (prev ? { ...prev, currentX: x, currentY: y } : null));
+      });
+      return;
+    }
+
     if (!isPanning) return;
     const dx = e.clientX - panStartRef.current.x;
     const dy = e.clientY - panStartRef.current.y;
-    setPan({
-      x: panStartRef.current.panX + dx,
-      y: panStartRef.current.panY + dy,
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      setPan({
+        x: panStartRef.current.panX + dx,
+        y: panStartRef.current.panY + dy,
+      });
     });
   }
 
   function handleMapPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (dragState) {
+      const assetId = dragState.assetId;
+      const finalX = dragState.currentX;
+      const finalY = dragState.currentY;
+      setDragState(null);
+      pinAsset(assetId, finalX, finalY);
+      return;
+    }
+
     if (isPanning) {
       setIsPanning(false);
       try {
         (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch { /* игнор */ }
+      } catch {
+        /* игнор */
+      }
     }
   }
 
-  // Перетаскивание маркера (Native Pointer Events)
+  // Плавный зум колесом мыши с центром в курсоре
+  function handleWheel(e: React.WheelEvent) {
+    if (e.ctrlKey || e.metaKey || e.deltaY) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      setZoom((z) => Math.max(0.3, Math.min(3, Math.round((z + delta) * 100) / 100)));
+    }
+  }
+
+  // Начало перетаскивания существующего маркера
   function handlePinPointerDown(e: React.PointerEvent, asset: Asset) {
     if (mode !== 'place') return;
     e.stopPropagation();
-    setDraggingAssetId(asset.id);
-    setSelectedAsset(asset);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }
-
-  function handlePinPointerMove(e: React.PointerEvent, assetId: string) {
-    if (draggingAssetId !== assetId || !mapCanvasRef.current) return;
-    e.stopPropagation();
-  }
-
-  function handlePinPointerUp(e: React.PointerEvent, asset: Asset) {
-    if (draggingAssetId !== asset.id || !mapCanvasRef.current) return;
-    e.stopPropagation();
-    setDraggingAssetId(null);
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch { /* игнор */ }
-
-    const rect = mapCanvasRef.current.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-
-    const dropX = e.clientX - rect.left;
-    const dropY = e.clientY - rect.top;
-
-    const x = Math.max(0, Math.min(1, dropX / rect.width));
-    const y = Math.max(0, Math.min(1, dropY / rect.height));
-
-    pinAsset(asset.id, x, y);
+    const x = Number(asset.floorPlanX) || 0;
+    const y = Number(asset.floorPlanY) || 0;
+    setDragState({
+      assetId: asset.id,
+      currentX: x,
+      currentY: y,
+    });
+    setSelectedAssetId(asset.id);
+    if (mapContainerRef.current) {
+      mapContainerRef.current.setPointerCapture(e.pointerId);
+    }
   }
 
   if (loading) {
-    return <div className="card"><div className="empty-state">Загрузка планов…</div></div>;
+    return (
+      <div className="card">
+        <div className="empty-state">Загрузка планов…</div>
+      </div>
+    );
   }
 
   if (plans.length === 0) {
     return (
       <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-        <div style={{ fontSize: 44, marginBottom: 12 }}>🗺</div>
+        <div style={{ fontSize: 48, marginBottom: 14 }}>🗺</div>
         <h3 style={{ margin: '0 0 8px' }}>Планы размещения ещё не созданы</h3>
-        <p style={{ color: 'var(--text-muted)', maxWidth: 480, margin: '0 auto 20px', fontSize: 14 }}>
-          Нарисуйте схему помещения прямо в браузере или загрузите готовый файл плана, чтобы расставить маркеры оборудования.
+        <p
+          style={{
+            color: 'var(--text-muted)',
+            maxWidth: 500,
+            margin: '0 auto 24px',
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}
+        >
+          Нарисуйте схему помещений прямо в браузере или загрузите готовый файл плана, чтобы расставить маркеры
+          оборудования и видеть их точное расположение.
         </p>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn btn--primary"
+            style={{ padding: '12px 20px', fontSize: 14 }}
             onClick={() => setEditorMode('create')}
           >
             ✏️ Нарисовать схему
@@ -346,9 +511,10 @@ export function FloorPlanView({
           <button
             type="button"
             className="btn"
+            style={{ padding: '12px 20px', fontSize: 14 }}
             onClick={() => setShowUploadModal(true)}
           >
-            📷 Загрузить картинку
+            📷 Загрузить файл плана
           </button>
         </div>
 
@@ -377,8 +543,18 @@ export function FloorPlanView({
   return (
     <div className="floor-plan-page">
       {msg && (
-        <div className={`banner ${msg.ok ? 'banner--success' : 'banner--error'}`} style={{ marginBottom: 12 }}>
-          {msg.text}
+        <div
+          className={`banner ${msg.ok ? 'banner--success' : 'banner--error'}`}
+          style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <span>{msg.text}</span>
+          <button
+            type="button"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'inherit' }}
+            onClick={() => setMsg(null)}
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -389,12 +565,12 @@ export function FloorPlanView({
             className="select"
             value={activePlanId || ''}
             onChange={(e) => setActivePlanId(e.target.value)}
-            style={{ fontWeight: 700, minWidth: 200 }}
+            style={{ fontWeight: 700, minWidth: 220 }}
           >
             {plans.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.planType === 'drawing' ? '✏️ ' : '📷 '}
-                {p.name} ({p.pinnedCount || 0} ед.)
+                {p.name} ({p.id === activePlanId ? pinnedAssets.length : p.pinnedCount || 0} ед.)
               </option>
             ))}
           </select>
@@ -418,20 +594,35 @@ export function FloorPlanView({
               ✏️ Редактор схемы
             </button>
           )}
+
+          <button
+            type="button"
+            className="btn btn--sm"
+            onClick={autoFit}
+            title="Вписать план по размеру экрана"
+          >
+            🔍 По размеру
+          </button>
         </div>
 
         <div className="floor-plan-topbar__right">
           <button
             type="button"
             className={`btn btn--sm ${mode === 'view' ? 'btn--primary' : ''}`}
-            onClick={() => { setMode('view'); setPendingAsset(null); }}
+            onClick={() => {
+              setMode('view');
+              setPendingAsset(null);
+            }}
           >
-            👁 Просмотр
+            👁 Просмотр ({pinnedAssets.length})
           </button>
           <button
             type="button"
             className={`btn btn--sm ${mode === 'place' ? 'btn--primary' : ''}`}
-            onClick={() => { setMode('place'); setSelectedAsset(null); }}
+            onClick={() => {
+              setMode('place');
+              setSelectedAssetId(null);
+            }}
           >
             📌 Размещение ({unplacedAssets.length})
           </button>
@@ -456,38 +647,54 @@ export function FloorPlanView({
 
       {/* Баннер ожидания клика по карте для размещения */}
       {pendingAsset && (
-        <div className="banner banner--info" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div
+          className="banner banner--info"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 12,
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
+          }}
+        >
           <div>
-            📍 <b>Нажмите на карту</b> в месте установки: <b>{pendingAsset.name}</b> ({pendingAsset.invNumber})
+            📍 <b>Кликните на плане</b>, чтобы поставить: <b>{pendingAsset.name}</b> ({pendingAsset.invNumber})
           </div>
           <button
             type="button"
             className="btn btn--sm"
             onClick={() => setPendingAsset(null)}
           >
-            Отмена
+            ✕ Отмена
           </button>
         </div>
       )}
 
-      {/* Основная рабочая область: карта + опциональный сайдбар неразмещенных */}
+      {/* Основная рабочая область: карта + боковая панель неразмещенных */}
       <div className={`floor-plan-layout ${mode === 'place' ? 'is-placing' : ''}`}>
         <div
-          className="floor-plan-viewport"
+          className={`floor-plan-viewport ${isDragOverCanvas ? 'is-drag-over' : ''}`}
           ref={mapContainerRef}
           onPointerDown={handleMapPointerDown}
           onPointerMove={handleMapPointerMove}
           onPointerUp={handleMapPointerUp}
+          onWheel={handleWheel}
           onClick={handleMapClick}
-          style={{ cursor: pendingAsset ? 'crosshair' : isPanning ? 'grabbing' : 'grab' }}
+          onDragOver={handleCanvasDragOver}
+          onDragLeave={handleCanvasDragLeave}
+          onDrop={handleCanvasDrop}
+          style={{
+            cursor: pendingAsset ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
+            touchAction: 'none',
+          }}
         >
           {/* Плавающий зум-тулбар */}
           <div className="floor-plan-zoom-bar">
             <button
               type="button"
               className="btn btn--sm btn--icon"
-              onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
-              title="Увеличить"
+              onClick={() => setZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}
+              title="Увеличить (+)"
             >
               +
             </button>
@@ -495,77 +702,100 @@ export function FloorPlanView({
             <button
               type="button"
               className="btn btn--sm btn--icon"
-              onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
-              title="Уменьшить"
+              onClick={() => setZoom((z) => Math.max(0.3, Math.round((z - 0.25) * 100) / 100))}
+              title="Уменьшить (−)"
             >
               −
             </button>
             <button
               type="button"
               className="btn btn--sm btn--icon"
-              onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
-              title="Сбросить масштаб"
+              onClick={() => {
+                setZoom(1);
+                setPan({ x: 0, y: 0 });
+              }}
+              title="Сбросить масштаб (100%)"
             >
               ↺
             </button>
           </div>
 
+          {/* Подсказка в режиме перетаскивания */}
+          {isDragOverCanvas && (
+            <div className="floor-plan-drop-overlay">
+              <div className="floor-plan-drop-badge">🎯 Отпустите, чтобы поставить оборудование</div>
+            </div>
+          )}
+
           {/* Трансформируемый холст с планом и пинами */}
           <div
             className="floor-plan-stage"
             style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transform: `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})`,
               transformOrigin: '0 0',
+              willChange: isPanning || dragState ? 'transform' : 'auto',
+              transition: isPanning || dragState ? 'none' : 'transform 0.12s ease-out',
             }}
           >
             {activePlan && (
-              <div ref={mapCanvasRef} className="floor-plan-canvas">
+              <div
+                ref={mapCanvasRef}
+                className="floor-plan-canvas"
+                style={{
+                  width: activePlan.width > 0 ? `${activePlan.width}px` : '1200px',
+                  height: activePlan.height > 0 ? `${activePlan.height}px` : '800px',
+                  position: 'relative',
+                }}
+              >
                 {activePlan.planType === 'drawing' && activePlan.drawingData ? (
-                  <DrawingRenderer
-                    data={activePlan.drawingData as unknown as DrawingData}
-                  />
+                  <DrawingRenderer data={activePlan.drawingData as unknown as DrawingData} />
                 ) : (
                   <img
                     src={activePlan.imageUrl}
                     alt={activePlan.name}
                     className="floor-plan-img"
                     draggable={false}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      display: 'block',
+                      userSelect: 'none',
+                    }}
                   />
                 )}
 
                 {/* Маркеры на карте */}
                 {pinnedAssets.map((asset) => {
-                  const x = Number(asset.floorPlanX) || 0;
-                  const y = Number(asset.floorPlanY) || 0;
-                  const isSelected = selectedAsset?.id === asset.id;
-                  const isDragging = draggingAssetId === asset.id;
+                  const isDragging = dragState?.assetId === asset.id;
+                  const x = isDragging ? dragState.currentX : Number(asset.floorPlanX) || 0;
+                  const y = isDragging ? dragState.currentY : Number(asset.floorPlanY) || 0;
+                  const isSelected = selectedAssetId === asset.id;
                   const st = STATUS[asset.status || 'in_use'] || STATUS.in_use;
                   const tag = tagByAsset.get(asset.id);
 
                   return (
                     <div
                       key={asset.id}
-                      className={`map-pin ${isSelected ? 'is-selected' : ''} ${isDragging ? 'is-dragging' : ''} ${mode === 'place' ? 'is-movable' : ''}`}
+                      className={`map-pin ${isSelected ? 'is-selected' : ''} ${
+                        isDragging ? 'is-dragging' : ''
+                      } ${mode === 'place' ? 'is-movable' : ''}`}
                       style={{
                         left: `${x * 100}%`,
                         top: `${y * 100}%`,
+                        pointerEvents: isPanning ? 'none' : 'auto',
                       }}
                       onPointerDown={(e) => handlePinPointerDown(e, asset)}
-                      onPointerMove={(e) => handlePinPointerMove(e, asset.id)}
-                      onPointerUp={(e) => handlePinPointerUp(e, asset)}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (mode === 'view') {
-                          setSelectedAsset(isSelected ? null : asset);
-                        }
+                        setSelectedAssetId(isSelected ? null : asset.id);
                       }}
+                      title={`${asset.name} (${asset.invNumber})${tag ? ` [🏷 ${tag}]` : ''}`}
                     >
                       <div className="map-pin__dot" style={{ background: st.color }}>
                         <span className="map-pin__icon">📍</span>
                       </div>
-                      <div className="map-pin__label">
-                        {tag || asset.name}
-                      </div>
+                      <div className="map-pin__label">{tag || asset.name}</div>
                     </div>
                   );
                 })}
@@ -581,13 +811,15 @@ export function FloorPlanView({
                   <div className="map-popover__title">{selectedAsset.name}</div>
                   <div className="map-popover__inv">
                     {selectedAsset.invNumber}
-                    {tagByAsset.get(selectedAsset.id) ? ` · 🏷 ${tagByAsset.get(selectedAsset.id)}` : ' · без наклейки'}
+                    {tagByAsset.get(selectedAsset.id)
+                      ? ` · 🏷 ${tagByAsset.get(selectedAsset.id)}`
+                      : ' · без наклейки'}
                   </div>
                 </div>
                 <button
                   type="button"
                   className="btn btn--sm btn--icon"
-                  onClick={() => setSelectedAsset(null)}
+                  onClick={() => setSelectedAssetId(null)}
                 >
                   ✕
                 </button>
@@ -597,7 +829,10 @@ export function FloorPlanView({
                 <div className="map-popover__grid">
                   <div>
                     <span className="map-popover__label">Место:</span>{' '}
-                    {(selectedAsset.locationId && locations.find((l) => l.id === selectedAsset.locationId)?.name) || selectedAsset.location || '—'}
+                    {(selectedAsset.locationId &&
+                      locations.find((l) => l.id === selectedAsset.locationId)?.name) ||
+                      selectedAsset.location ||
+                      '—'}
                   </div>
                   {mol(selectedAsset) && (
                     <div>
@@ -605,23 +840,26 @@ export function FloorPlanView({
                     </div>
                   )}
                   <div>
-                    <span className="map-popover__label">Стоимость:</span> {money(Number(selectedAsset.initialCost) || 0)} сум
+                    <span className="map-popover__label">Стоимость:</span>{' '}
+                    {money(Number(selectedAsset.initialCost) || 0)} сум
                   </div>
                   <div>
-                    <span className="map-popover__label">Обход:</span> {selectedAsset.lastInventoriedAt ? day(selectedAsset.lastInventoriedAt) : 'не сверяли'}
+                    <span className="map-popover__label">Обход:</span>{' '}
+                    {selectedAsset.lastInventoriedAt
+                      ? day(selectedAsset.lastInventoriedAt)
+                      : 'не сверяли'}
                   </div>
                 </div>
               </div>
 
               <div className="map-popover__foot">
-                <a
+                <button
+                  type="button"
                   className="btn btn--sm"
-                  href={`/dashboard/assets/${selectedAsset.id}`}
-                  target="_blank"
-                  rel="noreferrer"
+                  onClick={() => onEditAsset(selectedAsset)}
                 >
-                  Карточка ↗
-                </a>
+                  ✏️ Изменить
+                </button>
                 <button
                   type="button"
                   className="btn btn--sm"
@@ -645,12 +883,13 @@ export function FloorPlanView({
         {mode === 'place' && (
           <div className="floor-plan-sidebar">
             <div className="floor-plan-sidebar__head">
-              <h4 style={{ margin: 0 }}>Не на карте ({unplacedAssets.length})</h4>
-              <button
-                type="button"
-                className="btn btn--sm"
-                onClick={() => setMode('view')}
-              >
+              <div>
+                <h4 style={{ margin: 0, fontSize: 14 }}>Не на карте ({unplacedAssets.length})</h4>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  💡 Перетащите на план или нажмите «Поставить»
+                </div>
+              </div>
+              <button type="button" className="btn btn--sm" onClick={() => setMode('view')}>
                 Готово
               </button>
             </div>
@@ -658,7 +897,7 @@ export function FloorPlanView({
             <div className="floor-plan-sidebar__filters">
               <input
                 className="input input--sm"
-                placeholder="Поиск по имени, номеру…"
+                placeholder="Поиск по названию, номеру…"
                 value={sidebarSearch}
                 onChange={(e) => setSidebarSearch(e.target.value)}
               />
@@ -668,9 +907,11 @@ export function FloorPlanView({
                   value={sidebarLocation}
                   onChange={(e) => setSidebarLocation(e.target.value)}
                 >
-                  <option value="all">Все места</option>
+                  <option value="all">Все места ({locations.length})</option>
                   {locations.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
                   ))}
                 </select>
               )}
@@ -684,10 +925,18 @@ export function FloorPlanView({
                   <div
                     key={u.id}
                     className={`unplaced-item ${isSelectedForPlace ? 'is-pending' : ''}`}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', u.id);
+                      e.dataTransfer.setData('application/asset-id', u.id);
+                      e.dataTransfer.effectAllowed = 'copyMove';
+                    }}
                     onClick={() => {
                       setPendingAsset(isSelectedForPlace ? null : u);
                     }}
+                    title="Зажмите и перетащите на план, либо кликните «Поставить»"
                   >
+                    <div className="unplaced-item__drag-handle">⠿</div>
                     <div className="unplaced-item__main">
                       <div className="unplaced-item__name">{u.name}</div>
                       <div className="unplaced-item__meta">
@@ -698,15 +947,19 @@ export function FloorPlanView({
                     <button
                       type="button"
                       className={`btn btn--sm ${isSelectedForPlace ? 'btn--primary' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPendingAsset(isSelectedForPlace ? null : u);
+                      }}
                     >
-                      {isSelectedForPlace ? 'Клик на карту' : 'Поставить'}
+                      {isSelectedForPlace ? 'Клик на план' : 'Поставить'}
                     </button>
                   </div>
                 );
               })}
               {unplacedAssets.length === 0 && (
-                <div className="empty-state" style={{ padding: 20 }}>
-                  Все позиции размещены
+                <div className="empty-state" style={{ padding: 24, fontSize: 13 }}>
+                  ✨ Все единицы оборудования размещены на плане!
                 </div>
               )}
             </div>
@@ -720,35 +973,70 @@ export function FloorPlanView({
           <div className="modal-card modal-card--sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3 className="modal-title">➕ Создать новый план</h3>
-              <button type="button" className="btn btn--sm btn--icon" onClick={() => setShowChoiceModal(false)}>✕</button>
+              <button
+                type="button"
+                className="btn btn--sm btn--icon"
+                onClick={() => setShowChoiceModal(false)}
+              >
+                ✕
+              </button>
             </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '20px 16px' }}>
+            <div
+              className="modal-body"
+              style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '20px 16px' }}
+            >
               <button
                 type="button"
                 className="btn btn--primary"
-                style={{ padding: '14px 16px', fontSize: 14, justifyContent: 'flex-start', textAlign: 'left' }}
+                style={{
+                  padding: '14px 16px',
+                  fontSize: 14,
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                }}
                 onClick={() => {
                   setShowChoiceModal(false);
                   setEditorMode('create');
                 }}
               >
-                ✏️ <b>Нарисовать схему</b>
-                <span style={{ display: 'block', fontSize: 12, opacity: 0.85, fontWeight: 400, marginTop: 2 }}>
-                  Встроенный редактор зон и стен прямо в браузере
+                ✏️ <b>Нарисовать схему помещения</b>
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    opacity: 0.85,
+                    fontWeight: 400,
+                    marginTop: 3,
+                  }}
+                >
+                  Векторный редактор зон, стен и текста прямо в браузере
                 </span>
               </button>
               <button
                 type="button"
                 className="btn"
-                style={{ padding: '14px 16px', fontSize: 14, justifyContent: 'flex-start', textAlign: 'left' }}
+                style={{
+                  padding: '14px 16px',
+                  fontSize: 14,
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                }}
                 onClick={() => {
                   setShowChoiceModal(false);
                   setShowUploadModal(true);
                 }}
               >
-                📷 <b>Загрузить картинку</b>
-                <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>
-                  Загрузить готовый файл плана (JPG, PNG, WebP, SVG)
+                📷 <b>Загрузить файл изображения</b>
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    fontWeight: 400,
+                    marginTop: 3,
+                  }}
+                >
+                  Загрузить готовый чертёж или картинку (JPG, PNG, WebP, SVG)
                 </span>
               </button>
             </div>
@@ -773,7 +1061,11 @@ export function FloorPlanView({
       {editorMode && (
         <FloorPlanEditor
           initialName={editorMode === 'edit' ? activePlan?.name : ''}
-          initialData={editorMode === 'edit' ? (activePlan?.drawingData as unknown as DrawingData) : null}
+          initialData={
+            editorMode === 'edit'
+              ? (activePlan?.drawingData as unknown as DrawingData)
+              : null
+          }
           onSave={handleSaveDrawing}
           onClose={() => setEditorMode(null)}
         />
@@ -787,7 +1079,9 @@ export function FloorPlanView({
           tags={tags}
           locations={locations}
           onFinish={async () => {}}
-          onBound={async () => { await onRefresh(); }}
+          onBound={async () => {
+            await onRefresh();
+          }}
           onClose={() => setShowScanModal(false)}
         />
       )}
@@ -796,9 +1090,9 @@ export function FloorPlanView({
 }
 
 /**
- * Рендерер нарисованной схемы помещений через SVG
+ * Векторный рендерер нарисованной схемы помещения
  */
-function DrawingRenderer({ data }: { data: DrawingData }) {
+const DrawingRenderer = React.memo(function DrawingRenderer({ data }: { data: DrawingData }) {
   const w = data.canvasWidth || 1200;
   const h = data.canvasHeight || 800;
 
@@ -807,22 +1101,24 @@ function DrawingRenderer({ data }: { data: DrawingData }) {
       viewBox={`0 0 ${w} ${h}`}
       className="floor-plan-svg"
       style={{
-        width: `${w}px`,
-        height: `${h}px`,
-        maxWidth: '100%',
+        width: '100%',
+        height: '100%',
         display: 'block',
         pointerEvents: 'none',
-        borderRadius: '4px',
-        border: '1px solid var(--border)',
+        borderRadius: '6px',
         background: 'var(--surface)',
       }}
     >
       <defs>
-        <pattern id="grid-pattern-view" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="1" />
+        <pattern id="grid-view-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.03)" strokeWidth="1" />
         </pattern>
+        <filter id="view-room-shadow" x="-3%" y="-3%" width="106%" height="106%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.06" />
+        </filter>
       </defs>
-      <rect width={w} height={h} fill="url(#grid-pattern-view)" />
+
+      <rect width={w} height={h} fill="url(#grid-view-pattern)" />
 
       {(data.shapes || []).map((shape) => {
         if (shape.type === 'rect') {
@@ -836,9 +1132,10 @@ function DrawingRenderer({ data }: { data: DrawingData }) {
                 width={sw}
                 height={sh}
                 fill={shape.fill || '#f4f4f4'}
-                stroke={shape.stroke || '#999'}
+                stroke={shape.stroke || '#78909c'}
                 strokeWidth={2}
-                rx={4}
+                rx={6}
+                filter="url(#view-room-shadow)"
               />
               {shape.label && (
                 <text
@@ -846,8 +1143,8 @@ function DrawingRenderer({ data }: { data: DrawingData }) {
                   y={shape.y + sh / 2}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fill="#222222"
-                  fontSize={14}
+                  fill="#1e293b"
+                  fontSize={Math.min(18, Math.max(12, Math.round(sw / 14)))}
                   fontWeight={700}
                 >
                   {shape.label}
@@ -865,8 +1162,8 @@ function DrawingRenderer({ data }: { data: DrawingData }) {
               y1={shape.y}
               x2={shape.x2 ?? shape.x + 40}
               y2={shape.y2 ?? shape.y}
-              stroke={shape.stroke || '#444'}
-              strokeWidth={3}
+              stroke={shape.stroke || '#333333'}
+              strokeWidth={4}
               strokeLinecap="round"
             />
           );
@@ -878,9 +1175,9 @@ function DrawingRenderer({ data }: { data: DrawingData }) {
               key={shape.id}
               x={shape.x}
               y={shape.y}
-              fill={shape.fill || '#222'}
+              fill={shape.fill || '#1e293b'}
               fontSize={shape.fontSize || 16}
-              fontWeight={600}
+              fontWeight={700}
             >
               {shape.text || ''}
             </text>
@@ -891,10 +1188,10 @@ function DrawingRenderer({ data }: { data: DrawingData }) {
       })}
     </svg>
   );
-}
+});
 
 /**
- * Модальное окно загрузки графического плана помещения
+ * Модальное окно загрузки графического файла плана помещения
  */
 function FloorPlanUploadModal({
   onClose,
@@ -940,7 +1237,7 @@ function FloorPlanUploadModal({
     setError('');
 
     try {
-      // 1. Загрузка файла в Supabase Storage через /api/uploads
+      // 1. Загрузка файла в Supabase Storage
       const fd = new FormData();
       fd.append('kind', 'floor_plan');
       fd.append('file', file);
@@ -985,7 +1282,9 @@ function FloorPlanUploadModal({
       <div className="modal-card modal-card--md" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h3 className="modal-title">📷 Загрузить файл плана помещения</h3>
-          <button type="button" className="btn btn--sm btn--icon" onClick={onClose}>✕</button>
+          <button type="button" className="btn btn--sm btn--icon" onClick={onClose}>
+            ✕
+          </button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -1005,7 +1304,7 @@ function FloorPlanUploadModal({
             </div>
 
             <div className="field">
-              <label className="field__label">Изображение плана (JPG, PNG, WebP, SVG до 10 МБ) *</label>
+              <label className="field__label">Файл изображения (JPG, PNG, WebP, SVG до 10 МБ) *</label>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/svg+xml"
@@ -1017,9 +1316,20 @@ function FloorPlanUploadModal({
             {preview && (
               <div style={{ marginTop: 6 }}>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-                  Размер: {dims.width} × {dims.height} px
+                  Разрешение: {dims.width} × {dims.height} px
                 </div>
-                <div style={{ maxHeight: 200, overflow: 'hidden', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div
+                  style={{
+                    maxHeight: 200,
+                    overflow: 'hidden',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <img
                     src={preview}
                     alt="Предпросмотр"
