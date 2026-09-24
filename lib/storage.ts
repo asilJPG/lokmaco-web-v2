@@ -40,13 +40,18 @@ export const PHOTO_LABELS: Record<PhotoKind, string> = {
   floor_plan: 'План помещения',
 };
 
-// Клиент жмёт фото до ~1600px/jpeg 0.8 (обычно 150–400 КБ). 3 МБ — потолок
-// с большим запасом: всё, что больше, значит сжатие на клиенте не отработало.
-export const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
-// Планы помещений могут быть детализированными схемами до 10 МБ.
-export const MAX_FLOOR_PLAN_BYTES = 10 * 1024 * 1024;
+export const MAX_PHOTO_BYTES = 25 * 1024 * 1024;
+export const MAX_FLOOR_PLAN_BYTES = 25 * 1024 * 1024;
 
-export const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/webp', 'image/png', 'image/svg+xml'];
+export const ALLOWED_PHOTO_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/svg+xml',
+  'image/heic',
+  'image/heif',
+];
 
 function creds(): { url: string; key: string } {
   const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
@@ -72,9 +77,12 @@ function headers(key: string): Record<string, string> {
 
 const EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
   'image/webp': 'webp',
   'image/png': 'png',
   'image/svg+xml': 'svg',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
 };
 
 /**
@@ -89,7 +97,7 @@ export function buildPhotoPath(filialId: number, kind: PhotoKind, contentType: s
 
 /** Путь принадлежит одному из филиалов пользователя? Заодно отсекает `..` и абсолютные пути. */
 export function isPathAllowed(path: string, filialIds: number[]): boolean {
-  if (!/^\d+\/\d{4}-\d{2}-\d{2}\/[a-f0-9-]{36}-(goods|invoice|item|collage|floor_plan)\.(jpg|webp|png|svg)$/.test(path)) return false;
+  if (!/^\d+\/\d{4}-\d{2}-\d{2}\/[a-f0-9-]{36}-(goods|invoice|item|collage|floor_plan)\.(jpg|jpeg|webp|png|svg|heic|heif)$/i.test(path)) return false;
   return filialIds.includes(Number(path.split('/')[0]));
 }
 

@@ -11,24 +11,8 @@ const MAX_SIDE = 1600;
 const QUALITY = 0.8;
 
 export async function compressImage(file: File): Promise<File> {
-  const bitmap = await loadBitmap(file);
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return file;
-  ctx.drawImage(bitmap as CanvasImageSource, 0, 0, w, h);
-  if ('close' in bitmap && typeof bitmap.close === 'function') bitmap.close();
-
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', QUALITY));
-  // Если canvas по какой-то причине не отдал blob — лучше отправить оригинал,
-  // чем потерять фото: размер всё равно проверит сервер.
-  if (!blob) return file;
-  return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+  // Возвращаем оригинальный файл без обрезки и искажений canvas
+  return file;
 }
 
 async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {

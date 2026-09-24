@@ -107,8 +107,8 @@ export async function sendInvoicePhotos(row: {
     const bytes = new Uint8Array(await new Response(file.body).arrayBuffer());
     files.push({
       bytes,
-      contentType: file.contentType,
-      filename: `${p.product_name || PHOTO_LABELS[p.kind] || 'photo'}.jpg`,
+      contentType: file.contentType || 'image/jpeg',
+      filename: `photo_${files.length + 1}.jpg`,
     });
   }
   if (files.length === 0) return false;

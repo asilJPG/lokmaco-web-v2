@@ -7,12 +7,10 @@ import { PHOTO_LABELS, type PhotoKind } from '@/lib/storage';
 export type Photo = { path: string; url: string; kind: PhotoKind };
 
 async function upload(file: File, kind: PhotoKind): Promise<Photo> {
-  // Жмём до отправки: снимок с телефона это 3–8 МБ, а на мобильном
-  // интернете такая загрузка занимает минуты и упирается в лимит тела.
-  const small = await compressImage(file);
+  // Отправляем оригинальный полный снимок без обрезки и искажений
   const form = new FormData();
   form.append('kind', kind);
-  form.append('file', small);
+  form.append('file', file);
   const res = await fetch('/api/uploads', { method: 'POST', body: form });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.path) throw new Error(data.error || 'Не удалось загрузить фото');

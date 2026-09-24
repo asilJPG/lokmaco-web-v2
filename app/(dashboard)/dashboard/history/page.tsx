@@ -46,6 +46,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: { [k
             cash: sql<string>`(${schema.botActions.details}->'payments'->>'cash')`,
             totalSales: sql<string>`(${schema.botActions.details}->>'total_sales')`,
             totalExpenses: sql<string>`(${schema.botActions.details}->>'total_expenses')`,
+            iikoRevenue: sql<string>`(${schema.botActions.details}->>'iiko_revenue')`,
             wageCount: sql<number>`jsonb_array_length(coalesce(${schema.botActions.details}->'employee_wages','[]'::jsonb))`,
           })
           .from(schema.botActions)
@@ -109,6 +110,8 @@ export default async function HistoryPage({ searchParams }: { searchParams: { [k
                   <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Выручка</th>
                   <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Расходы</th>
                   <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>ЗП (чел)</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>iiko</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Разница</th>
                   <th style={{ borderBottom: '1px solid var(--border)' }} />
                 </tr>
               </thead>
@@ -126,6 +129,19 @@ export default async function HistoryPage({ searchParams }: { searchParams: { [k
                     <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(Number(r.totalSales) || 0)}</td>
                     <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(Number(r.totalExpenses) || 0)}</td>
                     <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>{r.wageCount}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>
+                      {r.iikoRevenue ? fmtMoney(Number(r.iikoRevenue)) : '—'}
+                    </td>
+                    {(() => {
+                      const iiko = Number(r.iikoRevenue) || 0;
+                      const sales = Number(r.totalSales) || 0;
+                      const diff = iiko ? sales - iiko : 0;
+                      return (
+                        <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid var(--border)', fontVariantNumeric: 'tabular-nums', color: !iiko ? 'var(--text-muted)' : diff === 0 ? 'var(--green)' : 'var(--red)', fontWeight: diff !== 0 && iiko ? 600 : 400 }}>
+                          {!iiko ? '—' : diff === 0 ? '0 ✓' : fmtMoney(diff)}
+                        </td>
+                      );
+                    })()}
                     <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid var(--border)', color: 'var(--text-faint)' }} aria-hidden="true">→</td>
                   </tr>
                 ))}
