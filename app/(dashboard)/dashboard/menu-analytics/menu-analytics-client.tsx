@@ -96,8 +96,11 @@ export function MenuAnalyticsClient() {
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  // Автообновление в реальном времени
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const sp = new URLSearchParams();
@@ -122,13 +125,21 @@ export function MenuAnalyticsClient() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить аналитику');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [selectedSite, preset, isCustom, customFrom, customTo]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadData]);
 
   // Фильтрация списка блюд
   const filteredItems = useMemo(() => {
@@ -233,6 +244,14 @@ export function MenuAnalyticsClient() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             type="button"
+            className={`btn btn--sm ${autoRefresh ? 'btn--primary' : ''}`}
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            title="Автоматически обновлять аналитику каждые 15 секунд"
+          >
+            {autoRefresh ? '🟢 Live (15с)' : '⚪ Live'}
+          </button>
+          <button
+            type="button"
             className="btn btn--sm"
             onClick={() => setShowCodeModal(true)}
             title="Инструкция и код для вставки на сайты меню"
@@ -242,7 +261,7 @@ export function MenuAnalyticsClient() {
           <button
             type="button"
             className="btn btn--sm btn--primary"
-            onClick={loadData}
+            onClick={() => loadData(false)}
             disabled={loading}
           >
             {loading ? '⏳' : '🔄'} Обновить
@@ -359,7 +378,7 @@ export function MenuAnalyticsClient() {
                 <button
                   type="button"
                   className="btn btn--sm btn--primary"
-                  onClick={loadData}
+                  onClick={() => loadData(false)}
                   style={{ padding: '4px 10px', fontSize: 12 }}
                 >
                   OK
