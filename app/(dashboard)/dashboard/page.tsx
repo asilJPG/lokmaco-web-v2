@@ -72,6 +72,8 @@ export default async function DashboardHome() {
   const filialNames = filialList.map((f) => f.name).join(', ') || '—';
   const td = todayData.rows[0] || { revenue: '0', cash: '0', expenses: '0', wages: '0' };
 
+  const canSeeFinancials = canAccess(session?.role, 'cashier') || canAccess(session?.role, 'safe') || canAccess(session?.role, 'analytics');
+
   return (
     <div>
       <h1 className="page-title">Добро пожаловать, {session?.name}</h1>
@@ -79,29 +81,33 @@ export default async function DashboardHome() {
         Роль: <code>{session?.role}</code> · Филиалы: <b>{filialNames}</b>
       </p>
 
-      <h2 style={{ marginTop: 24, marginBottom: 12, fontSize: 14, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Вчера · {yesterday}</h2>
-      <div className="stat-grid">
-        <div className="stat-card">
-          <div className="stat-card__label">💰 Выручка</div>
-          <div className="stat-card__value" style={{ color: 'var(--success)' }}>{fmtMoney(Number(td.revenue))}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__label">💵 Наличные</div>
-          <div className="stat-card__value">{fmtMoney(Number(td.cash))}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__label">🛒 Расходы кассира</div>
-          <div className="stat-card__value">{fmtMoney(Number(td.expenses))}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__label">👥 ЗП</div>
-          <div className="stat-card__value">{fmtMoney(Number(td.wages))}</div>
-        </div>
-      </div>
+      {canSeeFinancials && (
+        <>
+          <h2 style={{ marginTop: 24, marginBottom: 12, fontSize: 14, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Вчера · {yesterday}</h2>
+          <div className="stat-grid">
+            <div className="stat-card">
+              <div className="stat-card__label">💰 Выручка</div>
+              <div className="stat-card__value" style={{ color: 'var(--success)' }}>{fmtMoney(Number(td.revenue))}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card__label">💵 Наличные</div>
+              <div className="stat-card__value">{fmtMoney(Number(td.cash))}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card__label">🛒 Расходы кассира</div>
+              <div className="stat-card__value">{fmtMoney(Number(td.expenses))}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card__label">👥 ЗП</div>
+              <div className="stat-card__value">{fmtMoney(Number(td.wages))}</div>
+            </div>
+          </div>
 
-      <div style={{ marginTop: 16 }}>
-        <RevenueSparkline points={series} />
-      </div>
+          <div style={{ marginTop: 16 }}>
+            <RevenueSparkline points={series} />
+          </div>
+        </>
+      )}
 
       <h2 style={{ marginTop: 24, marginBottom: 12, fontSize: 14, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Быстрые действия</h2>
       {/* Кнопки фильтруются той же матрицей, что и меню: кассиру предлагалось
@@ -109,10 +115,11 @@ export default async function DashboardHome() {
       <div className="quick-actions">
         {[
           { href: '/dashboard/cashier', label: '🧾 Закрыть смену', primary: true },
+          { href: '/dashboard/inbox', label: '📨 Подтверждения', primary: true },
           { href: '/dashboard/safe', label: '💰 Сейф' },
           { href: '/dashboard/balances', label: '📦 Остатки' },
           { href: '/dashboard/transfer', label: '🔄 Перемещение' },
-          { href: '/dashboard/invoice', label: '🧾 Приход накладной' },
+          { href: '/dashboard/invoice', label: '🚚 Приход накладной' },
           { href: '/dashboard/history', label: '🗂️ История' },
         ]
           .filter((a) => {

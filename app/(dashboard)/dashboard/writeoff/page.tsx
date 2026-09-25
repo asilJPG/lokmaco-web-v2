@@ -17,7 +17,7 @@ export default async function WriteoffPage() {
         <h1 className="page-title">Списание</h1>
         <p className="page-subtitle">Акт списания в iiko: бой, порча, пищевые потери.</p>
       </div>
-      <WriteoffClient isAdmin={baseRole === 'admin'} fixedStoreId={storeId || null} />
+      <WriteoffClient isAdmin={baseRole === 'admin' || baseRole === 'accountant'} fixedStoreId={storeId || null} />
     </div>
   );
 }

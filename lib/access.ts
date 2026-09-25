@@ -35,30 +35,27 @@ const ACCESS: Record<Section, readonly string[] | typeof ALL> = {
 
   // cash — admin + cashier.
   cashier: ['admin', 'cashier'],
-  // Подтверждения — часть потока перемещений, роли те же.
-  inbox: ['admin', 'kitchen', 'prep_chef', 'bar', 'supplier', 'hall'],
-  // История в легаси висела внутри каждого раздела и роли не ограничивала.
-  history: ALL,
+  // Подтверждения — часть потока перемещений, видны создателям, складам и бухгалтеру/админу.
+  inbox: ['admin', 'kitchen', 'prep_chef', 'bar', 'supplier', 'hall', 'accountant'],
+  // История смен кассы — для тех, кто закрывает или проверяет смены.
+  history: ['admin', 'director', 'cashier', 'manager'],
   // attendance: вкладка «Кадры» скрыта от менеджера.
   attendance: ['admin', 'director'],
 
-  // balances: `role !== "manager"`.
-  balances: ['admin', 'director', 'supplier', 'kitchen', 'prep_chef', 'bar', 'cashier', 'hall'],
-  transfer: ['admin', 'kitchen', 'prep_chef', 'bar', 'supplier', 'hall'],
-  // Отправка перемещения напрямую в iiko, минуя подтверждение получателем.
-  // Сужено до админа осознанно: остальные роли создают перемещение только
-  // через подтверждение, чтобы принимающий склад видел, что ему приехало.
-  // Раздел не страничный — в HREF_TO_SECTION его нет.
-  transferDirect: ['admin'],
-  invoice: ['admin', 'supplier'],
-  inventory: ['admin', 'kitchen', 'prep_chef', 'bar', 'supplier'],
-  production: ['admin', 'prep_chef', 'bar'],
-  writeoff: ['admin', 'bar'],
-  services: ['admin', 'supplier', 'director'],
-  // Документы iiko — раздела в легаси не было; ставим как у детализации ОПиУ.
-  documents: ['admin', 'director'],
-  // fixed_assets.
-  assets: ['admin', 'manager'],
+  // Раздел «Склад»: доступен бухгалтеру целиком (остатки, перемещения, накладные, ОС и т.д.)
+  balances: ['admin', 'director', 'supplier', 'kitchen', 'prep_chef', 'bar', 'cashier', 'hall', 'accountant'],
+  transfer: ['admin', 'kitchen', 'prep_chef', 'bar', 'supplier', 'hall', 'accountant'],
+  // Отправка перемещения напрямую в iiko или через подтверждение.
+  transferDirect: ['admin', 'accountant'],
+  invoice: ['admin', 'supplier', 'accountant'],
+  inventory: ['admin', 'kitchen', 'prep_chef', 'bar', 'supplier', 'accountant'],
+  production: ['admin', 'prep_chef', 'bar', 'accountant'],
+  writeoff: ['admin', 'bar', 'accountant'],
+  services: ['admin', 'supplier', 'director', 'accountant'],
+  // Документы iiko — просмотр всех документов по складу.
+  documents: ['admin', 'director', 'accountant'],
+  // Опись ОС.
+  assets: ['admin', 'manager', 'accountant'],
 
   // Аналитика: сама вкладка — director/manager/admin, дальше по под-вкладкам.
   analytics: ['admin', 'director', 'manager'],

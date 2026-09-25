@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 // Роли и ограничение по складу — дословно из легаси
 // (app/api/iiko/inventory/route.js).
-const ALLOWED_ROLES = ['admin', 'director', 'kitchen', 'prep_chef', 'bar', 'supplier'];
+const ALLOWED_ROLES = ['admin', 'director', 'kitchen', 'prep_chef', 'bar', 'supplier', 'accountant'];
 
 export async function POST(req: Request) {
   const session = await requireSession();

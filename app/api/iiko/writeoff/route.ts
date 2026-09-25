@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   const session = await requireSession();
   const [baseRole, userStoreId] = session.role.split(':');
-  if (!['admin', 'bar'].includes(baseRole)) {
+  if (!['admin', 'bar', 'accountant'].includes(baseRole)) {
     return Response.json({ error: 'Доступ запрещен для вашей роли' }, { status: 403 });
   }
 
@@ -25,8 +25,8 @@ export async function POST(req: Request) {
   const storeId = userStoreId || b.store_id;
   if (!storeId) return Response.json({ error: 'Не указан склад для проведения акта' }, { status: 400 });
 
-  // Счёт списания меняет только админ; всем остальным — пищевые потери.
-  const accountId = baseRole === 'admin' && b.account_id ? b.account_id : WRITEOFF_ACCOUNT_ID;
+  // Счёт списания меняет админ и бухгалтер; всем остальным — пищевые потери.
+  const accountId = ['admin', 'accountant'].includes(baseRole) && b.account_id ? b.account_id : WRITEOFF_ACCOUNT_ID;
 
   const comment = `${b.comment || 'Списание через сайт'} (Создал: ${session.name})`;
   const { xml: creds } = await resolveIikoCreds(filialId);

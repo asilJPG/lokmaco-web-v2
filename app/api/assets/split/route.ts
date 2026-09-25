@@ -6,7 +6,7 @@ import { baseInvNumber, unitInvNumber, unitSuffix } from '@/lib/inv-number';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED = ['admin', 'manager'];
+const ALLOWED = ['admin', 'manager', 'accountant'];
 const MAX_UNITS = 200;
 
 /**

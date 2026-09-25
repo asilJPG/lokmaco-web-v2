@@ -7,7 +7,7 @@ import { normalizeTagCode, TAG_PREFIX } from '@/lib/asset-tags';
 export const dynamic = 'force-dynamic';
 
 // Роли — дословно из легаси (app/api/iiko/assets/tags/route.js).
-const ALLOWED = ['admin', 'manager'];
+const ALLOWED = ['admin', 'manager', 'accountant'];
 const MAX_BATCH = 500;
 
 function denied(role: string): boolean {

@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // Список ролей и ограничение по складу — дословно из легаси
 // (app/api/iiko/invoice/route.js): роут пишет документ в iiko, и без проверки
 // приход мог оформить любой залогиненный.
-const ALLOWED_ROLES = ['admin', 'director', 'supplier'];
+const ALLOWED_ROLES = ['admin', 'director', 'supplier', 'accountant'];
 
 export async function POST(req: Request) {
   const session = await requireSession();

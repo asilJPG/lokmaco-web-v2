@@ -9,6 +9,7 @@ import { PeriodPicker } from '@/components/period-picker';
 import { Copyable } from '@/components/copy-button';
 import { InlineSearch } from '@/components/inline-search';
 import { StackTable } from '@/components/stack-table';
+import { requireAccess } from '@/lib/access';
 
 export const metadata = { title: 'История' };
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,8 @@ export const dynamic = 'force-dynamic';
 const PAGE_SIZE = 50;
 
 export default async function HistoryPage({ searchParams }: { searchParams: { [k: string]: string | string[] | undefined } }) {
-  await getSession();
+  const session = await getSession();
+  requireAccess(session?.role, 'history', '/dashboard');
   const filialIds = await getCurrentFilialIds();
   const sp = toURLSearchParams(searchParams);
   const period = parsePeriod(sp);

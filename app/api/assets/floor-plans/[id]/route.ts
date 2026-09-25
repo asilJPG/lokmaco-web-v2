@@ -6,7 +6,7 @@ import { deletePhoto } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
-const CAN_EDIT = ['admin', 'manager'];
+const CAN_EDIT = ['admin', 'manager', 'accountant'];
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await requireSession();

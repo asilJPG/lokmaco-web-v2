@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 // Роли — дословно из легаси (app/api/iiko/production/route.js). Склад у акта
 // приготовления берётся из роли, отдельной проверки store_id там нет.
-const ALLOWED_ROLES = ['admin', 'prep_chef', 'bar'];
+const ALLOWED_ROLES = ['admin', 'prep_chef', 'bar', 'accountant'];
 
 export async function POST(req: Request) {
   const session = await requireSession();

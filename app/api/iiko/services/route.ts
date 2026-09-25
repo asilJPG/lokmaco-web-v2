@@ -17,7 +17,7 @@ const SERVICE_PRODUCT = '69aab99f-deeb-4bf1-804b-0b13373910a0'; // Трансп�
 export async function POST(req: Request) {
   const session = await requireSession();
   const [baseRole, userStoreId] = session.role.split(':');
-  if (!['admin', 'director', 'supplier'].includes(baseRole)) {
+  if (!['admin', 'director', 'supplier', 'accountant'].includes(baseRole)) {
     return Response.json({ error: 'Доступ запрещен для вашей роли' }, { status: 403 });
   }
 

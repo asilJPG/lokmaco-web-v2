@@ -17,7 +17,7 @@ export default async function ServicesPage() {
         <h1 className="page-title">Услуги</h1>
         <p className="page-subtitle">Акт на услугу без товара: доставка, транспорт, разовые расходы.</p>
       </div>
-      <ServicesClient isAdmin={baseRole === 'admin' || baseRole === 'director'} fixedStoreId={storeId || null} />
+      <ServicesClient isAdmin={baseRole === 'admin' || baseRole === 'director' || baseRole === 'accountant'} fixedStoreId={storeId || null} />
     </div>
   );
 }

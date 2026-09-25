@@ -4,7 +4,7 @@ import { getUserFilialIds } from '@/lib/current-filial';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_ROLES = ['admin', 'director', 'supplier'];
+const ALLOWED_ROLES = ['admin', 'director', 'supplier', 'accountant'];
 
 /**
  * Прокси к приватному бакету.

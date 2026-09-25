@@ -17,7 +17,7 @@ type Purchase = { date: string | null; price: number; sum: number; amount: numbe
 
 export async function POST() {
   const session = await requireSession();
-  if (!['admin', 'manager'].includes(session.role.split(':')[0])) {
+  if (!['admin', 'manager', 'accountant'].includes(session.role.split(':')[0])) {
     return Response.json({ error: 'Доступ только для администратора и менеджера' }, { status: 403 });
   }
 

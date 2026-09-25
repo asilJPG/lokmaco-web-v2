@@ -15,7 +15,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 // admin, director, supplier загружают фото приходов; manager и admin загружают планы помещений.
-const ALLOWED_ROLES = ['admin', 'director', 'supplier', 'manager'];
+const ALLOWED_ROLES = ['admin', 'director', 'supplier', 'manager', 'accountant'];
 
 /**
  * Приём одной фотографии. Загружаем по одной, а не пачкой: на мобильном

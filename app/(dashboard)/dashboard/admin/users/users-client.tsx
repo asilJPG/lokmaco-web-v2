@@ -17,7 +17,31 @@ type User = {
 
 type Filial = { id: number; name: string };
 
-const ROLES = ['admin', 'director', 'cashier', 'kitchen', 'manager'];
+export const ROLE_LABELS: Record<string, string> = {
+  admin: 'Администратор (admin)',
+  director: 'Директор (director)',
+  accountant: 'Бухгалтер (accountant)',
+  manager: 'Менеджер (manager)',
+  cashier: 'Кассир (cashier)',
+  kitchen: 'Кухня (kitchen)',
+  prep_chef: 'Заготовщик (prep_chef)',
+  bar: 'Бар (bar)',
+  supplier: 'Снабженец (supplier)',
+  hall: 'Зал (hall)',
+};
+
+const ROLES = [
+  'admin',
+  'director',
+  'accountant',
+  'manager',
+  'cashier',
+  'kitchen',
+  'prep_chef',
+  'bar',
+  'supplier',
+  'hall',
+];
 
 export function UsersClient({ users, filials, currentUserId }: { users: User[]; filials: Filial[]; currentUserId: number }) {
   const router = useRouter();
@@ -105,7 +129,7 @@ export function UsersClient({ users, filials, currentUserId }: { users: User[]; 
               </div>
 
               <div className="user-card__rows">
-                <div><span>Роль</span><b>{u.role.split(':')[0]}</b></div>
+                <div><span>Роль</span><b>{ROLE_LABELS[u.role.split(':')[0]] || u.role.split(':')[0]}</b></div>
                 <div>
                   <span>Филиалы</span>
                   <b>
@@ -169,7 +193,7 @@ function UserForm({ initial, filials, onSubmit, onCancel }: {
         <div className="field">
           <label className="field__label">Роль</label>
           <select className="select" value={role.split(':')[0]} onChange={(e) => setRole(e.target.value + (role.includes(':') ? ':' + role.split(':')[1] : ''))}>
-            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
           </select>
         </div>
         <div className="field">

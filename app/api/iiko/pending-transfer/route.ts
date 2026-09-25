@@ -26,16 +26,16 @@ export async function GET() {
   const list = await listPendingTransfers(filialIds);
 
   const [baseRole, storeId] = session.role.split(':');
-  const isAdmin = baseRole === 'admin';
+  const canSeeAll = baseRole === 'admin' || baseRole === 'accountant';
   const tgId = String(session.tgId ?? '');
 
   const incoming = list.filter((it) =>
     (it.status === 'pending_receiver' || it.status === 'pending_sender') &&
-    (isAdmin ||
+    (canSeeAll ||
       (it.status === 'pending_receiver' && String(it.storeTo) === String(storeId)) ||
       (it.status === 'pending_sender' && String(it.storeFrom) === String(storeId)))
   );
-  const returned = list.filter((it) => it.status === 'pending_creator' && (isAdmin || String(it.creatorTgId) === tgId));
+  const returned = list.filter((it) => it.status === 'pending_creator' && (canSeeAll || String(it.creatorTgId) === tgId));
   const outgoing = list.filter(
     (it) => (it.status === 'pending_receiver' || it.status === 'pending_sender') &&
       String(it.creatorTgId) === tgId &&
@@ -78,9 +78,7 @@ export async function POST(req: Request) {
   }
 }
 
-// Тот же список, что и в легаси на /api/iiko/transfer: там оба сценария
-// (создание и согласование) жили в одном роуте с одной проверкой.
-const ALLOWED_ROLES = ['admin', 'director', 'supplier', 'kitchen', 'prep_chef', 'bar', 'hall'];
+const ALLOWED_ROLES = ['admin', 'director', 'supplier', 'kitchen', 'prep_chef', 'bar', 'hall', 'accountant'];
 
 async function handlePost(req: Request, b: any) {
   const session = await requireSession();
@@ -93,7 +91,7 @@ async function handlePost(req: Request, b: any) {
 
   const action: string | undefined = b.action;
   const [baseRole, userStoreId] = session.role.split(':');
-  const isAdmin = baseRole === 'admin';
+  const canManageAll = baseRole === 'admin' || baseRole === 'accountant';
 
   if (!action) {
     if (!b.store_from || !b.store_to || !Array.isArray(b.items) || b.items.length === 0) {
@@ -134,15 +132,15 @@ async function handlePost(req: Request, b: any) {
   if (!id) return Response.json({ error: 'id required' }, { status: 400 });
   const doc = await getPendingTransferById(id);
   if (!doc) return Response.json({ error: 'not found' }, { status: 404 });
-  if (!isAdmin && !(await getUserFilialIds()).includes(doc.filialId)) {
+  if (!canManageAll && !(await getUserFilialIds()).includes(doc.filialId)) {
     return Response.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   if (['approve_by_receiver', 'reject_by_receiver', 'modify_by_receiver'].includes(action)) {
     if (doc.status === 'pending_receiver') {
-      if (!isAdmin && String(doc.storeTo) !== String(userStoreId)) return Response.json({ error: 'Не получатель' }, { status: 403 });
+      if (!canManageAll && String(doc.storeTo) !== String(userStoreId)) return Response.json({ error: 'Не получатель' }, { status: 403 });
     } else if (doc.status === 'pending_sender') {
-      if (!isAdmin && String(doc.storeFrom) !== String(userStoreId)) return Response.json({ error: 'Не отправитель' }, { status: 403 });
+      if (!canManageAll && String(doc.storeFrom) !== String(userStoreId)) return Response.json({ error: 'Не отправитель' }, { status: 403 });
     } else {
       return Response.json({ error: 'Неверный статус' }, { status: 400 });
     }
@@ -153,7 +151,7 @@ async function handlePost(req: Request, b: any) {
     if (doc.status !== 'pending_creator') {
       return Response.json({ error: 'Неверный статус' }, { status: 400 });
     }
-    if (!isAdmin && String(doc.creatorTgId) !== String(session.tgId)) return Response.json({ error: 'Не создатель' }, { status: 403 });
+    if (!canManageAll && String(doc.creatorTgId) !== String(session.tgId)) return Response.json({ error: 'Не создатель' }, { status: 403 });
   }
 
   const items: TransferItem[] = Array.isArray(b.items) ? b.items : doc.items;

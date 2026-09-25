@@ -6,7 +6,7 @@ import { baseInvNumber, unitSuffix } from '@/lib/inv-number';
 
 export const dynamic = 'force-dynamic';
 
-const CAN_EDIT = ['admin', 'manager'];
+const CAN_EDIT = ['admin', 'manager', 'accountant'];
 
 async function logAssetAction(actionType: string, documentNumber: string, details: Record<string, unknown>, session: { tgId: number | null; name: string }) {
   const ids = await getCurrentFilialIds();

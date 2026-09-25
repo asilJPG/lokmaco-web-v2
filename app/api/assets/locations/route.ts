@@ -6,7 +6,7 @@ import { getCurrentFilialIds } from '@/lib/current-filial';
 export const dynamic = 'force-dynamic';
 
 // Роли — дословно из легаси (app/api/iiko/assets/locations/route.js).
-const ALLOWED = ['admin', 'manager'];
+const ALLOWED = ['admin', 'manager', 'accountant'];
 
 function denied(role: string): boolean {
   return !ALLOWED.includes(role.split(':')[0]);

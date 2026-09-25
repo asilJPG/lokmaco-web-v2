@@ -5,7 +5,7 @@ import { getCurrentFilialIds } from '@/lib/current-filial';
 
 export const dynamic = 'force-dynamic';
 
-const CAN_EDIT = ['admin', 'manager'];
+const CAN_EDIT = ['admin', 'manager', 'accountant'];
 
 export async function PATCH(req: Request) {
   const session = await requireSession();
