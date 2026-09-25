@@ -279,6 +279,36 @@ export const scanInbox = pgTable('scan_inbox', {
   byFilialStatus: index('scan_inbox_filial_status_idx').on(t.filialId, t.status, t.createdAt),
 }));
 
+/**
+ * События веб-аналитики электронных меню (посещения, клики по блюдам, категории).
+ * Сайты: Lokmaco, Luma Garden.
+ */
+export const menuAnalyticsEvents = pgTable('menu_analytics_events', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  siteId: text('site_id').notNull(),
+  eventType: text('event_type').notNull(),
+  visitorId: text('visitor_id').notNull(),
+  sessionId: text('session_id'),
+  pagePath: text('page_path'),
+  itemId: text('item_id'),
+  itemName: text('item_name'),
+  itemCategory: text('item_category'),
+  itemPrice: numeric('item_price'),
+  referrer: text('referrer'),
+  deviceType: text('device_type'),
+  userAgent: text('user_agent'),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  bySiteCreated: index('menu_events_site_created_idx').on(t.siteId, t.createdAt),
+  bySiteTypeCreated: index('menu_events_site_type_created_idx').on(t.siteId, t.eventType, t.createdAt),
+  bySiteItemCreated: index('menu_events_site_item_created_idx').on(t.siteId, t.itemName, t.createdAt),
+  byVisitorCreated: index('menu_events_visitor_created_idx').on(t.visitorId, t.createdAt),
+}));
+
+export type MenuAnalyticsEvent = typeof menuAnalyticsEvents.$inferSelect;
+export type NewMenuAnalyticsEvent = typeof menuAnalyticsEvents.$inferInsert;
+
 export interface DrawingShape {
   id: string;
   type: 'rect' | 'line' | 'text';

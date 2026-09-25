@@ -16,12 +16,16 @@ const PUBLIC_API = new Set([
   '/api/auth/access-code',
   '/api/inbound/scan',
   '/api/telegram/purchases',
+  '/api/analytics/menu/track',
+  '/api/menu-analytics/track',
 ]);
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
   if (path.startsWith('/api/')) {
+    // CORS OPTIONS preflight
+    if (req.method === 'OPTIONS') return NextResponse.next();
     if (PUBLIC_API.has(path)) return NextResponse.next();
     const session = await verifySession(req.cookies.get('session_token')?.value);
     if (!session) {

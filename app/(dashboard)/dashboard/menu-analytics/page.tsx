@@ -1,6 +1,12 @@
-import { redirect } from 'next/navigation';
+import { requireSession } from '@/lib/auth-session';
+import { MenuAnalyticsClient } from './menu-analytics-client';
 
-/** Раздел переехал во вкладку единой «Аналитики» — сохраняем старые ссылки. */
-export default function LegacyRedirect() {
-  redirect('/dashboard/analytics?tab=abc');
+export const metadata = {
+  title: 'Аналитика меню (Lokmaco & Luma Garden)',
+};
+
+export default async function MenuAnalyticsPage() {
+  await requireSession();
+
+  return <MenuAnalyticsClient />;
 }

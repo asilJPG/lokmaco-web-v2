@@ -54,6 +54,7 @@ const GROUPS: Group[] = [
     title: 'Аналитика',
     items: [
       { href: '/dashboard/analytics', label: 'Обзор', icon: '📊', section: 'analytics' },
+      { href: '/dashboard/menu-analytics', label: 'Аналитика меню', icon: '📱', section: 'analytics' },
       { href: '/dashboard/analytics?tab=pl', label: 'ОПиУ', icon: '📈', section: 'analytics.pl' },
       { href: '/dashboard/analytics?tab=abc', label: 'ABC-анализ блюд', icon: '🍽', section: 'analytics.abc' },
       { href: '/dashboard/analytics?tab=liquidity', label: 'Ликвидность', icon: '🧊', section: 'analytics.liquidity' },

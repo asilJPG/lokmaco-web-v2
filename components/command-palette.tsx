@@ -19,6 +19,7 @@ const ITEMS: Item[] = [
   { href: '/dashboard/production', label: 'Приготовление', icon: '🍳', group: 'Склад' },
   { href: '/dashboard/documents', label: 'Документы iiko', icon: '📑', group: 'Склад' },
   { href: '/dashboard/analytics', label: 'Обзор', icon: '📊', group: 'Аналитика' },
+  { href: '/dashboard/menu-analytics', label: 'Аналитика меню', icon: '📱', group: 'Аналитика', section: 'analytics' },
   { href: '/dashboard/analytics?tab=pl', label: 'ОПиУ', icon: '📈', group: 'Аналитика', section: 'analytics.pl' },
   { href: '/dashboard/analytics?tab=abc', label: 'ABC-анализ блюд', icon: '🍽', group: 'Аналитика', section: 'analytics.abc' },
   { href: '/dashboard/analytics?tab=liquidity', label: 'Ликвидность', icon: '🧊', group: 'Аналитика', section: 'analytics.liquidity' },
