@@ -23,7 +23,7 @@ export function initMenuTracker(options: MenuTrackerOptions) {
   if (typeof window === 'undefined') return null;
 
   const siteId = options.siteId;
-  const apiHost = options.apiHost || 'https://v2.lokmaco.uz';
+  const apiHost = options.apiHost || 'https://lokmaco-web-v2.vercel.app';
   const trackUrl = `${apiHost.replace(/\/+$/, '')}/api/analytics/menu/track`;
 
   // 1. Уникальный ID посетителя (хранится в localStorage бессрочно)

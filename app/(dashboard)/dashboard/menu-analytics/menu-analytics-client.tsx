@@ -177,7 +177,7 @@ export function MenuAnalyticsClient() {
 <script>
   (function() {
     var SITE_ID = '${snippetSiteId}';
-    var API_URL = '${typeof window !== 'undefined' ? window.location.origin : 'https://v2.lokmaco.uz'}/api/analytics/menu/track';
+    var API_URL = '${typeof window !== 'undefined' ? window.location.origin : 'https://lokmaco-web-v2.vercel.app'}/api/analytics/menu/track';
     
     var vid = localStorage.getItem('__lkm_vid');
     if (!vid) {
