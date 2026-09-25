@@ -17,6 +17,7 @@ const SERVICE_PRODUCT = '69aab99f-deeb-4bf1-804b-0b13373910a0'; // Трансп�
 export async function POST(req: Request) {
   const session = await requireSession();
   const [baseRole, userStoreId] = session.role.split(':');
+  const canManageAll = baseRole === 'admin' || baseRole === 'director' || baseRole === 'accountant';
   if (!['admin', 'director', 'supplier', 'accountant'].includes(baseRole)) {
     return Response.json({ error: 'Доступ запрещен для вашей роли' }, { status: 403 });
   }
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
 
   const b = await req.json();
   const storeId: string = b.store_id || userStoreId || '';
-  if (userStoreId && storeId !== userStoreId) {
+  if (!canManageAll && userStoreId && storeId !== userStoreId) {
     return Response.json({ error: 'Вы можете оформлять акты только на свой склад' }, { status: 403 });
   }
   if (!storeId || !b.account_id || !b.sum) {

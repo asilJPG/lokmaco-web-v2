@@ -13,6 +13,7 @@ const ALLOWED_ROLES = ['admin', 'director', 'kitchen', 'prep_chef', 'bar', 'supp
 export async function POST(req: Request) {
   const session = await requireSession();
   const [baseRole, userStoreId] = session.role.split(':');
+  const canManageAll = baseRole === 'admin' || baseRole === 'director' || baseRole === 'accountant';
   if (!ALLOWED_ROLES.includes(baseRole)) {
     return Response.json({ error: 'Доступ запрещен для вашей роли' }, { status: 403 });
   }
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
   if (!b.store_id || !Array.isArray(b.items) || b.items.length === 0) {
     return Response.json({ error: 'store_id, items required' }, { status: 400 });
   }
-  if (userStoreId && b.store_id !== userStoreId) {
+  if (!canManageAll && userStoreId && b.store_id !== userStoreId) {
     return Response.json({ error: 'Вы можете проводить инвентаризацию только на своем складе' }, { status: 403 });
   }
 

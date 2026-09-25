@@ -10,6 +10,7 @@ export type AdminUserRow = {
   lastLoginAt: Date | null;
   filialIds: number[];
   passkeyCount: number;
+  permissions?: string[] | null;
 };
 
 export async function listUsers(): Promise<AdminUserRow[]> {
@@ -43,6 +44,7 @@ export async function listUsers(): Promise<AdminUserRow[]> {
     lastLoginAt: u.lastLoginAt,
     filialIds: linkMap.get(u.id) || [],
     passkeyCount: passkeyMap.get(u.id) || 0,
+    permissions: (u.permissions as string[] | null) ?? null,
   }));
 }
 

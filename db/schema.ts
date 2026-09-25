@@ -22,6 +22,7 @@ export const users = pgTable('bot_users', {
   accessCode: text('access_code'),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   lastLoginMethod: text('last_login_method'),
+  permissions: jsonb('permissions').$type<string[] | null>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

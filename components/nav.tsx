@@ -77,12 +77,21 @@ const GROUPS: Group[] = [
     items: [
       { href: '/dashboard/profile', label: 'Профиль', icon: '🙂', section: 'profile' },
       { href: '/dashboard/admin/users', label: 'Пользователи', icon: '👤', section: 'adminUsers' },
+      { href: '/dashboard/admin/permissions', label: 'Права доступа', icon: '🔐', section: 'adminUsers' },
       { href: '/dashboard/admin/filials', label: 'Филиалы', icon: '🏢', section: 'adminFilials' },
     ],
   },
 ];
 
-export function SidebarNav({ role, badges }: { role: string; badges?: { inbox?: number } }) {
+export function SidebarNav({
+  role,
+  permissions,
+  badges,
+}: {
+  role: string;
+  permissions?: (string | Section)[] | null;
+  badges?: { inbox?: number };
+}) {
   const path = usePathname();
   const sp = useSearchParams();
 
@@ -101,7 +110,7 @@ export function SidebarNav({ role, badges }: { role: string; badges?: { inbox?: 
   }
 
   function allowed(item: Item): boolean {
-    return canAccess(role, item.section);
+    return canAccess(role, item.section, permissions);
   }
 
   return (

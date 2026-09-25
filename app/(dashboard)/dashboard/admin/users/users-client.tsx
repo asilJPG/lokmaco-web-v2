@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Copyable } from '@/components/copy-button';
 
@@ -13,6 +14,7 @@ type User = {
   lastLoginAt: Date | string | null;
   filialIds: number[];
   passkeyCount: number;
+  permissions?: string[] | null;
 };
 
 type Filial = { id: number; name: string };
@@ -121,6 +123,14 @@ export function UsersClient({ users, filials, currentUserId }: { users: User[]; 
                   {u.id === currentUserId && <span className="user-card__you">вы</span>}
                 </div>
                 <div className="user-card__buttons">
+                  <Link
+                    href={`/dashboard/admin/permissions?userId=${u.id}`}
+                    className="btn btn--sm"
+                    title="Настроить права доступа"
+                    style={{ fontSize: 12, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    🔐 Права
+                  </Link>
                   <button type="button" className="btn btn--sm" onClick={() => setEditing(u.id)}>✎</button>
                   {u.id !== currentUserId && (
                     <button type="button" className="btn btn--sm btn--danger" onClick={() => del(u.id)}>×</button>
@@ -136,6 +146,16 @@ export function UsersClient({ users, filials, currentUserId }: { users: User[]; 
                     {u.filialIds.length === 0
                       ? <em style={{ color: 'var(--warning)', fontStyle: 'normal' }}>не назначены</em>
                       : u.filialIds.map((fid) => filials.find((f) => f.id === fid)?.name || fid).join(', ')}
+                  </b>
+                </div>
+                <div>
+                  <span>Права</span>
+                  <b>
+                    {u.permissions && Array.isArray(u.permissions) ? (
+                      <span style={{ color: '#b45309' }}>Выборочные ({u.permissions.length})</span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>По роли</span>
+                    )}
                   </b>
                 </div>
                 <div><span>Код</span><b>{u.accessCode ? <Copyable value={u.accessCode} /> : '—'}</b></div>

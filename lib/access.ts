@@ -85,7 +85,17 @@ export function baseRole(role: string | null | undefined): string {
   return (role || '').split(':')[0];
 }
 
-export function canAccess(role: string | null | undefined, section: Section): boolean {
+export function canAccess(
+  role: string | null | undefined,
+  section: Section,
+  permissions?: (string | Section)[] | null
+): boolean {
+  // Если для пользователя настроены индивидуальные права (галочки):
+  if (Array.isArray(permissions)) {
+    if (section === 'home' || section === 'profile') return true;
+    return permissions.includes(section);
+  }
+
   const allowed = ACCESS[section];
   if (allowed === ALL) return true;
   return allowed.includes(baseRole(role));
@@ -95,8 +105,13 @@ export function canAccess(role: string | null | undefined, section: Section): bo
  * Страница, закрытая для роли, не должна открываться по прямой ссылке —
  * прятать пункт в меню мало. Уводим туда, куда роли точно можно.
  */
-export function requireAccess(role: string | null | undefined, section: Section, fallback = '/dashboard'): void {
-  if (!canAccess(role, section)) redirect(fallback);
+export function requireAccess(
+  role: string | null | undefined,
+  section: Section,
+  fallback = '/dashboard',
+  permissions?: (string | Section)[] | null
+): void {
+  if (!canAccess(role, section, permissions)) redirect(fallback);
 }
 
 /** Путь дашборда → раздел матрицы. Нужен плиткам лендингов. */

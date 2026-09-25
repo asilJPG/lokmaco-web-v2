@@ -21,8 +21,8 @@ export async function POST(req: Request) {
   const items = Array.isArray(b.items) ? b.items : [];
   if (items.length === 0) return Response.json({ error: 'Не выбраны товары' }, { status: 400 });
 
-  // Кассир/бар списывает только со своего склада — склад зашит в его роль.
-  const storeId = userStoreId || b.store_id;
+  const canManageAll = baseRole === 'admin' || baseRole === 'director' || baseRole === 'accountant';
+  const storeId = (canManageAll ? b.store_id : userStoreId) || b.store_id || userStoreId;
   if (!storeId) return Response.json({ error: 'Не указан склад для проведения акта' }, { status: 400 });
 
   // Счёт списания меняет админ и бухгалтер; всем остальным — пищевые потери.

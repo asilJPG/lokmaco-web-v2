@@ -40,14 +40,20 @@ export async function getUserFilialIds(): Promise<number[]> {
       .from(schema.userFilials)
       .where(eq(schema.userFilials.userId, session.id));
     const ids = rows.map((r) => r.filialId);
-    // Пустой список означает «филиалов не назначено», а не сбой, — но и
-    // выкидывать человека из уже работающей сессии из-за этого не станем.
-    const value = ids.length > 0 ? ids : session.filialIds;
+    let value = ids.length > 0 ? ids : (session.filialIds || []);
+    const baseRole = session.role.split(':')[0];
+    if (value.length === 0 && ['admin', 'director', 'accountant'].includes(baseRole)) {
+      const allFilials = await db.select({ id: schema.filials.id }).from(schema.filials);
+      value = allFilials.map((f) => f.id);
+    }
     cache.set(session.id, { ids: value, at: Date.now() });
     return value;
   } catch {
-    // База недоступна — работаем по списку из токена, как раньше.
-    return session.filialIds;
+    const baseRole = (session?.role || '').split(':')[0];
+    if ((!session.filialIds || session.filialIds.length === 0) && ['admin', 'director', 'accountant'].includes(baseRole)) {
+      return [1, 2];
+    }
+    return session.filialIds || [];
   }
 }
 

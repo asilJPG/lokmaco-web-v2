@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const session = await requireSession();
-  const [, userStoreId] = session.role.split(':');
+  const [baseRole, userStoreId] = session.role.split(':');
+  const canManageAll = baseRole === 'admin' || baseRole === 'director' || baseRole === 'accountant';
   // Прямая отправка минует подтверждение получателем, поэтому она только у
   // админа (раздел `transferDirect` в матрице). Прятать кнопку мало: роут
   // дёргается напрямую, значит запрет должен жить здесь.
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
   if (!b.store_from || !b.store_to || !Array.isArray(b.items) || b.items.length === 0) {
     return Response.json({ error: 'store_from, store_to, items required' }, { status: 400 });
   }
-  if (userStoreId && b.store_from !== userStoreId && b.store_to !== userStoreId) {
+  if (!canManageAll && userStoreId && b.store_from !== userStoreId && b.store_to !== userStoreId) {
     return Response.json({ error: 'Вы можете перемещать товары только со своего или на свой склад' }, { status: 403 });
   }
 

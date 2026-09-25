@@ -97,11 +97,11 @@ async function handlePost(req: Request, b: any) {
     if (!b.store_from || !b.store_to || !Array.isArray(b.items) || b.items.length === 0) {
       return Response.json({ error: 'store_from, store_to, items required' }, { status: 400 });
     }
-    if (userStoreId && b.store_from !== userStoreId && b.store_to !== userStoreId) {
+    if (!canManageAll && userStoreId && b.store_from !== userStoreId && b.store_to !== userStoreId) {
       return Response.json({ error: 'Только со своего/на свой склад' }, { status: 403 });
     }
     let status = 'pending_receiver';
-    if (userStoreId) {
+    if (!canManageAll && userStoreId) {
       if (String(b.store_to) === String(userStoreId)) status = 'pending_sender';
       else if (String(b.store_from) === String(userStoreId)) status = 'pending_receiver';
     }

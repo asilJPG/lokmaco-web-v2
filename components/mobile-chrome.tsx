@@ -57,12 +57,20 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-export function MobileTabBar({ role, badges }: { role: string; badges?: { inbox?: number } }) {
+export function MobileTabBar({
+  role,
+  permissions,
+  badges,
+}: {
+  role: string;
+  permissions?: (string | Section)[] | null;
+  badges?: { inbox?: number };
+}) {
   const path = usePathname();
   const [more, setMore] = useState(false);
   useCloseOnRouteChange(() => setMore(false));
 
-  const allowed = TABS.filter((t) => canAccess(role, t.section));
+  const allowed = TABS.filter((t) => canAccess(role, t.section, permissions));
   const inBar = allowed.length <= 5 ? allowed : allowed.slice(0, MAX_IN_BAR);
   const rest = allowed.length <= 5 ? [] : allowed.slice(MAX_IN_BAR);
 

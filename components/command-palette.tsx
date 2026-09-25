@@ -32,6 +32,7 @@ const ITEMS: Item[] = [
   { href: '/dashboard/pnl', label: 'P&L', icon: '📈', group: 'Финансы' },
   { href: '/dashboard/profile', label: 'Профиль', icon: '🙂', group: 'Настройки' },
   { href: '/dashboard/admin/users', label: 'Пользователи', icon: '👤', group: 'Настройки' },
+  { href: '/dashboard/admin/permissions', label: 'Права доступа', icon: '🔐', group: 'Настройки', section: 'adminUsers' },
   { href: '/dashboard/admin/filials', label: 'Филиалы', icon: '🏢', group: 'Настройки' },
   { href: '/dashboard/writeoff', label: 'Списание', icon: '🗑', group: 'Склад' },
   { href: '/dashboard/services', label: 'Услуги', icon: '🧾', group: 'Склад' },
@@ -54,7 +55,13 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
   return false;
 }
 
-export function CommandPalette({ role }: { role: string }) {
+export function CommandPalette({
+  role,
+  permissions,
+}: {
+  role: string;
+  permissions?: (string | Section)[] | null;
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -98,9 +105,9 @@ export function CommandPalette({ role }: { role: string }) {
     // куда роль всё равно не пустят.
     return ITEMS.filter((it) => {
       const section = it.section ?? sectionForHref(it.href);
-      return (!section || canAccess(role, section)) && fuzzyMatch(it.label + ' ' + it.group, query);
+      return (!section || canAccess(role, section, permissions)) && fuzzyMatch(it.label + ' ' + it.group, query);
     });
-  }, [query, role]);
+  }, [query, role, permissions]);
 
   useEffect(() => {
     if (active >= filtered.length) setActive(0);

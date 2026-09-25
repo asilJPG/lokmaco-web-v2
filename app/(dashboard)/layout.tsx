@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-session';
 import { getCurrentFilialId, getUserFilialIds } from '@/lib/current-filial';
+import { getUserPermissions } from '@/lib/user-permissions';
 import { SidebarNav } from '@/components/nav';
 import { FilialSwitcher } from '@/components/filial-switcher';
 import { LogoutButton } from '@/components/logout-button';
@@ -14,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session) redirect('/login');
 
   const baseRole = session.role.split(':')[0];
-  const allowAll = baseRole === 'admin' || baseRole === 'director';
+  const allowAll = baseRole === 'admin' || baseRole === 'director' || baseRole === 'accountant';
 
   // ⚠️ Членство в филиалах берём живым, а не из токена: список в JWT
   // фиксируется при входе и живёт неделю, поэтому добавленный сотруднику
@@ -22,9 +23,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // на другой нет.
   const filialIds = await getUserFilialIds();
 
-  // Оба запроса шли последовательно, а до пулера каждый круг ~200 мс — на
-  // загрузке любой страницы это лишние полсекунды. Ходим за ними разом.
-  const [filials, inboxRows, current] = await Promise.all([
+  // Загружаем филиалы, входящие заявки, текущий филиал и права доступа разом.
+  const [filials, inboxRows, current, userPermissions] = await Promise.all([
     filialIds.length > 0
       ? db.select({ id: schema.filials.id, name: schema.filials.name })
           .from(schema.filials)
@@ -43,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             )!
           )),
     getCurrentFilialId(),
+    getUserPermissions(session.id),
   ]);
   const inboxCount = Number(inboxRows[0]?.c || 0);
 
@@ -54,7 +55,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <span>Lokmaco</span>
         </div>
         <FilialSwitcher filials={filials} current={current} allowAll={allowAll} />
-        <SidebarNav role={session.role} badges={{ inbox: inboxCount }} />
+        <SidebarNav role={session.role} permissions={userPermissions} badges={{ inbox: inboxCount }} />
         <div className="cmdk-hint" data-print-hide style={{
           padding: '6px 12px 12px', fontSize: 11, color: 'var(--text-faint)',
           display: 'flex', alignItems: 'center', gap: 6,
@@ -72,8 +73,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </aside>
       <MobileTopBar filials={filials} current={current} allowAll={allowAll} userName={session.name} />
       <main className="app-main">{children}</main>
-      <MobileTabBar role={session.role} badges={{ inbox: inboxCount }} />
-      <CommandPalette role={session.role} />
+      <MobileTabBar role={session.role} permissions={userPermissions} badges={{ inbox: inboxCount }} />
+      <CommandPalette role={session.role} permissions={userPermissions} />
     </div>
   );
 }
