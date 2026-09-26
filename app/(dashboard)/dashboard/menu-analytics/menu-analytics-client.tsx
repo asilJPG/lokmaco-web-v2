@@ -96,8 +96,9 @@ export function MenuAnalyticsClient() {
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Автообновление в реальном времени
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  // Автообновление в реальном времени (по умолчанию включено)
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -118,6 +119,7 @@ export function MenuAnalyticsClient() {
       }
       const json: AnalyticsData = await res.json();
       setData(json);
+      setLastUpdated(new Date().toLocaleTimeString('ru-RU'));
       if (!isCustom) {
         setCustomFrom(json.from);
         setCustomTo(json.to);
@@ -241,7 +243,12 @@ export function MenuAnalyticsClient() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {lastUpdated && (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Обновлено: {lastUpdated}
+            </span>
+          )}
           <button
             type="button"
             className={`btn btn--sm ${autoRefresh ? 'btn--primary' : ''}`}
