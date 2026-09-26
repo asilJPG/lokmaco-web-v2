@@ -30,6 +30,7 @@ const GROUPS: Group[] = [
   {
     title: 'Смена',
     items: [
+      { href: '/dashboard/banquets', label: 'Бронь и банкеты', icon: '🥂', section: 'banquets' },
       { href: '/dashboard/cashier', label: 'Закрыть смену', icon: '🧾', section: 'cashier' },
       { href: '/dashboard/inbox', label: 'Подтверждения', icon: '📨', badgeKey: 'inbox', section: 'inbox' },
       { href: '/dashboard/history', label: 'История смен', icon: '🗂️', section: 'history' },

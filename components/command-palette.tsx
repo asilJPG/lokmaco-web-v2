@@ -9,6 +9,7 @@ type Item = { href: string; label: string; icon: string; group: string; section?
 const ITEMS: Item[] = [
   { href: '/dashboard', label: 'Главная', icon: '🏠', group: 'Навигация' },
   { href: '/dashboard/assistant', label: 'Ассистент', icon: '✨', group: 'Навигация' },
+  { href: '/dashboard/banquets', label: 'Бронь и банкеты', icon: '🥂', group: 'Смена', section: 'banquets' },
   { href: '/dashboard/cashier', label: 'Закрыть смену', icon: '🧾', group: 'Смена' },
   { href: '/dashboard/inbox', label: 'Подтверждения', icon: '📨', group: 'Смена' },
   { href: '/dashboard/history', label: 'История смен', icon: '🗂️', group: 'Смена' },

@@ -18,6 +18,8 @@ const PUBLIC_API = new Set([
   '/api/telegram/purchases',
   '/api/analytics/menu/track',
   '/api/menu-analytics/track',
+  '/api/bookings',
+  '/api/bookings/public',
 ]);
 
 export async function middleware(req: NextRequest) {
@@ -26,7 +28,7 @@ export async function middleware(req: NextRequest) {
   if (path.startsWith('/api/')) {
     // CORS OPTIONS preflight
     if (req.method === 'OPTIONS') return NextResponse.next();
-    if (PUBLIC_API.has(path)) return NextResponse.next();
+    if (PUBLIC_API.has(path) || path.startsWith('/api/bookings/public')) return NextResponse.next();
     const session = await verifySession(req.cookies.get('session_token')?.value);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,10 +42,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next({ request: { headers: h } });
   }
 
-  // ⚠️ `/tag/<код>` открыт намеренно: этот адрес зашит в QR наклеек, висящих
-  // в зале и на кухне. Их сканирует обычная камера телефона, без входа на
-  // сайт. Страница поэтому и не показывает ничего, кроме самого кода.
-  if (path === '/login' || path === '/' || path.startsWith('/tag/')) return NextResponse.next();
+  // ⚠️ `/tag/<код>` и `/booking` открыты без входа:
+  // Сотрудники оформляют банкет по прямой ссылке со смартфона/планшета без логина.
+  if (path === '/login' || path === '/' || path.startsWith('/tag/') || path.startsWith('/booking') || path.startsWith('/reserve')) return NextResponse.next();
 
   const session = await verifySession(req.cookies.get('session_token')?.value);
   if (!session) {

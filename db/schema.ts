@@ -310,6 +310,41 @@ export const menuAnalyticsEvents = pgTable('menu_analytics_events', {
 export type MenuAnalyticsEvent = typeof menuAnalyticsEvents.$inferSelect;
 export type NewMenuAnalyticsEvent = typeof menuAnalyticsEvents.$inferInsert;
 
+export const banquetBookings = pgTable('banquet_bookings', {
+  id: serial('id').primaryKey(),
+  filialId: integer('filial_id').notNull().references(() => filials.id, { onDelete: 'cascade' }),
+  restaurantName: text('restaurant_name').notNull().default('The Lokmaco'),
+  eventDate: date('event_date').notNull(),
+  eventTime: text('event_time').notNull(),
+  endTime: text('end_time'),
+  guestCount: integer('guest_count').notNull().default(1),
+  tableNumber: text('table_number').notNull(),
+  zone: text('zone').notNull().default('Основной зал'),
+  guestName: text('guest_name').notNull(),
+  guestPhone: text('guest_phone').notNull(),
+  employeeName: text('employee_name').notNull(),
+  occasion: text('occasion').default('birthday'),
+  occasionTitle: text('occasion_title').default('День рождения'),
+  depositAmount: numeric('deposit_amount').notNull().default('0'),
+  depositStatus: text('deposit_status').notNull().default('pending'),
+  depositMethod: text('deposit_method').default('cash'),
+  totalEstimate: numeric('total_estimate').notNull().default('0'),
+  status: text('status').notNull().default('confirmed'),
+  cancelReason: text('cancel_reason'),
+  specialRequests: text('special_requests'),
+  preorderItems: jsonb('preorder_items').notNull().default([]),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  byDate: index('banquet_date_idx').on(t.eventDate),
+  byFilialDate: index('banquet_filial_date_idx').on(t.filialId, t.eventDate),
+  byStatus: index('banquet_status_idx').on(t.status),
+}));
+
+export type BanquetBooking = typeof banquetBookings.$inferSelect;
+export type NewBanquetBooking = typeof banquetBookings.$inferInsert;
+
 export interface DrawingShape {
   id: string;
   type: 'rect' | 'line' | 'text';

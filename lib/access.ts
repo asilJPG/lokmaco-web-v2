@@ -15,7 +15,7 @@ import { redirect } from 'next/navigation';
  */
 export type Section =
   | 'home' | 'profile' | 'assistant'
-  | 'cashier' | 'inbox' | 'history' | 'attendance'
+  | 'cashier' | 'inbox' | 'history' | 'attendance' | 'banquets'
   | 'balances' | 'transfer' | 'transferDirect' | 'invoice' | 'inventory' | 'production'
   | 'writeoff' | 'services' | 'documents' | 'assets'
   | 'analytics' | 'analytics.pl' | 'analytics.abc' | 'analytics.liquidity'
@@ -32,6 +32,9 @@ const ACCESS: Record<Section, readonly string[] | typeof ALL> = {
 
   // agent — только admin.
   assistant: ['admin'],
+
+  // Банкеты и брони столов — менеджеры, директор, касса, зал и админ
+  banquets: ['admin', 'director', 'manager', 'cashier', 'hall'],
 
   // cash — admin + cashier.
   cashier: ['admin', 'cashier'],

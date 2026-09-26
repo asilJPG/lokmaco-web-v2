@@ -40,6 +40,7 @@ export const SECTIONS_CATALOG: SectionGroup[] = [
     title: 'Смена и подтверждения',
     icon: '🧾',
     sections: [
+      { id: 'banquets', title: 'Бронь и банкеты', description: 'Журнал бронирования столов, депозиты, предзаказы и банкетная аналитика', icon: '🥂' },
       { id: 'inbox', title: 'Подтверждения (Inbox)', description: 'Входящие и исходящие согласования перемещений', icon: '📨' },
       { id: 'cashier', title: 'Закрыть смену', description: 'Кассовый отчёт за день, внесение оплат и расходов', icon: '🧾' },
       { id: 'history', title: 'История смен', description: 'Журнал закрытых кассовых смен и отчётов', icon: '🗂️' },
