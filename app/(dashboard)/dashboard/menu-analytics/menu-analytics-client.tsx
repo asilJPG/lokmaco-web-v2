@@ -92,10 +92,6 @@ export function MenuAnalyticsClient() {
   const [itemSearch, setItemSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  // Модальное окно кода интеграции
-  const [showCodeModal, setShowCodeModal] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
-
   // Автообновление в реальном времени (по умолчанию включено)
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -173,63 +169,6 @@ export function MenuAnalyticsClient() {
     return data.topCategories.map((c) => c.category);
   }, [data?.topCategories]);
 
-  // Генерация кода трекера для выбранного сайта
-  const snippetSiteId = selectedSite === 'all' ? 'lokmaco' : selectedSite;
-  const trackingSnippet = `<!-- Вставьте перед закрывающим тегом </head> или в начале <body> -->
-<script>
-  (function() {
-    var SITE_ID = '${snippetSiteId}';
-    var API_URL = '${typeof window !== 'undefined' ? window.location.origin : 'https://lokmaco-web-v2.vercel.app'}/api/analytics/menu/track';
-    
-    var vid = localStorage.getItem('__lkm_vid');
-    if (!vid) {
-      vid = 'v_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-      localStorage.setItem('__lkm_vid', vid);
-    }
-    
-    var sid = sessionStorage.getItem('__lkm_sid');
-    if (!sid) {
-      sid = 's_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-      sessionStorage.setItem('__lkm_sid', sid);
-    }
-    
-    function send(type, data) {
-      var payload = Object.assign({
-        siteId: SITE_ID,
-        eventType: type,
-        visitorId: vid,
-        sessionId: sid,
-        pagePath: window.location.pathname,
-        referrer: document.referrer || ''
-      }, data || {});
-      
-      var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(API_URL, blob);
-      } else {
-        fetch(API_URL, { method: 'POST', body: blob, keepalive: true });
-      }
-    }
-    
-    // Автоматический трекинг первого просмотра
-    send('pageview');
-    
-    // Глобальное отслеживание кликов по блюдам с атрибутом data-menu-item
-    document.addEventListener('click', function(e) {
-      var el = e.target.closest('[data-menu-item]');
-      if (el) {
-        send('item_click', {
-          itemName: el.getAttribute('data-menu-item') || '',
-          itemCategory: el.getAttribute('data-category') || '',
-          itemPrice: Number(el.getAttribute('data-price')) || undefined
-        });
-      }
-    });
-    
-    window.__menuTracker = { trackPageView: function(p) { send('pageview', { pagePath: p }); }, trackItemClick: function(d) { send('item_click', d); } };
-  })();
-</script>`;
-
   return (
     <div className="grid" style={{ gap: 16 }}>
       {/* Шапка раздела */}
@@ -256,14 +195,6 @@ export function MenuAnalyticsClient() {
             title="Автоматически обновлять аналитику каждые 15 секунд"
           >
             {autoRefresh ? '🟢 Live (15с)' : '⚪ Live'}
-          </button>
-          <button
-            type="button"
-            className="btn btn--sm"
-            onClick={() => setShowCodeModal(true)}
-            title="Инструкция и код для вставки на сайты меню"
-          >
-            📋 Код для сайтов
           </button>
           <button
             type="button"
@@ -766,110 +697,7 @@ export function MenuAnalyticsClient() {
       </section>
 
       {/* Модальное окно с кодом для вставки на сайты меню */}
-      {showCodeModal && (
-        <div className="modal-backdrop" onClick={() => setShowCodeModal(false)}>
-          <div className="modal-card modal-card--lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3 className="modal-title">📋 Как подключить аналитику к меню</h3>
-              <button type="button" className="btn btn--sm btn--icon" onClick={() => setShowCodeModal(false)}>
-                ✕
-              </button>
-            </div>
-
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-                Чтобы посещаемость и клики по блюдам попадали в этот дашборд, добавьте трекер в проект меню.
-                Выберите сайт для генерации нужного <code>siteId</code>:
-              </p>
-
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className={`btn btn--sm ${snippetSiteId === 'lokmaco' ? 'btn--primary' : ''}`}
-                  onClick={() => setSelectedSite('lokmaco')}
-                >
-                  🍩 Lokmaco (siteId: &apos;lokmaco&apos;)
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn--sm ${snippetSiteId === 'luma_garden' ? 'btn--primary' : ''}`}
-                  onClick={() => setSelectedSite('luma_garden')}
-                >
-                  🌿 Luma Garden (siteId: &apos;luma_garden&apos;)
-                </button>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700 }}>Способ 1: Готовый HTML-скрипт (любой сайт)</span>
-                  <button
-                    type="button"
-                    className="btn btn--sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(trackingSnippet);
-                      setCopiedCode(true);
-                      setTimeout(() => setCopiedCode(false), 2000);
-                    }}
-                  >
-                    {copiedCode ? '✅ Скопировано!' : 'Скопировать код'}
-                  </button>
-                </div>
-                <pre
-                  style={{
-                    background: 'var(--surface-muted)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 8,
-                    padding: 12,
-                    fontSize: 11,
-                    overflowX: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    maxHeight: 240,
-                  }}
-                >
-                  {trackingSnippet}
-                </pre>
-              </div>
-
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>Способ 2: Для React / Next.js меню</span>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 8px' }}>
-                  В репозитории проекта меню достаточно импортировать трекер или вызывать клик при открытии карточки блюда:
-                </p>
-                <pre
-                  style={{
-                    background: 'var(--surface-muted)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 8,
-                    padding: 12,
-                    fontSize: 11,
-                    overflowX: 'auto',
-                  }}
-                >
-{`// При открытии карточки блюда в меню:
-fetch('${typeof window !== 'undefined' ? window.location.origin : 'https://v2.lokmaco.uz'}/api/analytics/menu/track', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    siteId: '${snippetSiteId}',
-    eventType: 'item_click',
-    itemName: dish.name,
-    itemCategory: dish.category,
-    itemPrice: dish.price,
-  }),
-  keepalive: true,
-});`}
-                </pre>
-              </div>
-            </div>
-
-            <div className="modal-foot">
-              <button type="button" className="btn btn--primary" onClick={() => setShowCodeModal(false)}>
-                Понятно
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
