@@ -38,7 +38,12 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body {
+  margin: 0;
+  padding: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
 html { color-scheme: light dark; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -107,8 +112,10 @@ button:focus-visible, a:focus-visible {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 268px 1fr;
+  grid-template-columns: 268px minmax(0, 1fr);
   min-height: 100vh;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .app-sidebar {
@@ -206,7 +213,12 @@ button:focus-visible, a:focus-visible {
 }
 .app-sidebar__user-name { color: var(--text); font-weight: 600; font-size: 13px; }
 
-.app-main { padding: var(--space-6); min-width: 0; }
+.app-main {
+  padding: var(--space-6);
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
 
 /* ---------------- Мобильная оболочка ----------------
    Сайтом пользуются в основном с телефона, поэтому на мобильном это не
@@ -217,8 +229,10 @@ button:focus-visible, a:focus-visible {
 
 @media (max-width: 768px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 1fr;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
   /* Боковое меню — только для десктопа. На телефоне навигацию рисует
      components/mobile-chrome.tsx. */
@@ -228,6 +242,9 @@ button:focus-visible, a:focus-visible {
     padding: var(--space-4);
     padding-top: calc(52px + env(safe-area-inset-top, 0px) + var(--space-3));
     padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px) + var(--space-4));
+    min-width: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   .mobile-topbar {
@@ -490,6 +507,9 @@ button:focus-visible, a:focus-visible {
   border-radius: var(--radius);
   padding: var(--space-5);
   transition: box-shadow 160ms, border-color 160ms;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
 .card__title {
@@ -502,8 +522,10 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  flex-wrap: wrap;
+  min-width: 0;
 }
-.card__title-text { display: flex; align-items: center; gap: var(--space-2); font-size: 14px; }
+.card__title-text { display: flex; align-items: center; gap: var(--space-2); font-size: 14px; flex-wrap: wrap; min-width: 0; }
 
 .field { display: flex; flex-direction: column; gap: var(--space-2); }
 .field__label {
@@ -569,11 +591,26 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
 .grid {
   display: grid;
   gap: var(--space-4);
+  min-width: 0;
+  max-width: 100%;
 }
-.grid--2 { grid-template-columns: repeat(2, 1fr); }
-.grid--auto { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid--auto { grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); }
+@media (max-width: 960px) {
+  .grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid--2 { grid-template-columns: 1fr; }
+}
 @media (max-width: 640px) {
   .grid--2, .grid--auto { grid-template-columns: 1fr; }
+  .grid--4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 360px) {
+  .grid--4 { grid-template-columns: 1fr; }
 }
 
 .btn {
@@ -794,11 +831,11 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
 .badge--danger { background: #fdeceb; color: var(--danger); }
 .badge--neutral { background: var(--surface-muted); color: var(--text-muted); }
 
-.heatmap { border-collapse: separate; border-spacing: 3px; font-size: 10px; }
+.heatmap { border-collapse: separate; border-spacing: 2px; font-size: 10px; width: 100%; max-width: 100%; }
 .heatmap th { color: var(--text-faint); font-weight: 500; padding: 0 1px; }
 .heatmap__label { color: var(--text-muted); padding-right: 6px; white-space: nowrap; }
 .heatmap__cell { padding: 0; }
-.heatmap__cell span { display: block; width: 100%; min-width: 26px; height: 22px; border-radius: 5px; }
+.heatmap__cell span { display: block; width: 100%; min-width: 18px; height: 18px; border-radius: 4px; }
 .heatmap__scale {
   display: flex;
   align-items: center;
@@ -807,6 +844,7 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
   font-size: 11px;
   color: var(--text-faint);
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 .heatmap__swatch { width: 20px; height: 10px; border-radius: 3px; }
 
@@ -821,8 +859,12 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
   border-left: 3px solid var(--success);
   border-radius: var(--radius);
   padding: var(--space-4) var(--space-5);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
-.insight__body { flex: 1 1 280px; }
+.insight__body { flex: 1 1 240px; min-width: 0; }
+.insight__total { min-width: 0; }
 .insight__title { font-size: 14px; font-weight: 600; }
 .insight__desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
 .insight__chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: var(--space-3); }
@@ -1064,22 +1106,35 @@ tr[data-today="true"] td:first-child {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: var(--space-3);
+  min-width: 0;
+  max-width: 100%;
+}
+.stat-grid > * {
+  min-width: 0;
+  max-width: 100%;
 }
 /* На телефоне 180px превращались в одну колонку: четыре цифры занимали весь
    экран, и до графиков надо было листать. Две колонки показывают сводку целиком. */
 @media (max-width: 768px) {
-  .stat-grid { grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
   .stat-card { padding: var(--space-3); }
-  .stat-card__value { font-size: 19px; }
+  .stat-card__value { font-size: 18px; }
   .stat-card__label { font-size: 11px; }
+}
+@media (max-width: 360px) {
+  .stat-grid { grid-template-columns: 1fr; }
 }
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-4) var(--space-5);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 .stat-card__label {
   font-size: 12px;
@@ -1088,18 +1143,29 @@ tr[data-today="true"] td:first-child {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 .stat-card__value {
   /* Monospaced figures so digits line up column-to-column across cards. */
   font-family: var(--font-num);
-  font-size: clamp(19px, 4vw, 25px);
+  font-size: clamp(17px, 3.5vw, 25px);
   font-weight: 600;
   margin-top: 8px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
   line-height: 1.15;
-  word-break: keep-all;
+  word-break: break-word;
   overflow-wrap: anywhere;
+}
+.stat-card__delta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-top: 6px;
 }
 
 /* Sticky action bar for mobile */

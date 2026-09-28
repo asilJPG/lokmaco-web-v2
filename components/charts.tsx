@@ -113,10 +113,10 @@ export function LineChart({
   const tooltipLeft = hover != null ? (x(hover, points.length) / W) * 100 : 0;
 
   return (
-    <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }}>
+    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', minWidth: 340, display: 'block' }}
+        style={{ width: '100%', minWidth: 260, maxWidth: '100%', display: 'block' }}
         role="img"
         onMouseLeave={() => setHover(null)}
       >
@@ -222,8 +222,8 @@ export function BarChart({ points, height = 240, unit = '' }: { points: SeriesPo
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({ v: max * f, y: padT + innerH - f * innerH }));
 
   return (
-    <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 340, display: 'block' }} role="img" onMouseLeave={() => setHover(null)}>
+    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 260, maxWidth: '100%', display: 'block' }} role="img" onMouseLeave={() => setHover(null)}>
         {ticks.map((t, i) => (
           <g key={i}>
             <line x1={padL} y1={t.y} x2={W - padR} y2={t.y} stroke="var(--border)" strokeWidth="1" />
@@ -283,8 +283,8 @@ export function DonutChart({ items, max = 8, unit = '' }: { items: DonutItem[]; 
   let offset = 0;
 
   return (
-    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-      <svg viewBox="0 0 160 160" style={{ width: 160, height: 160, flexShrink: 0 }} role="img">
+    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', minWidth: 0, maxWidth: '100%' }}>
+      <svg viewBox="0 0 160 160" style={{ width: 140, height: 140, flexShrink: 0, margin: '0 auto' }} role="img">
         <g transform="rotate(-90 80 80)">
           {slices.map((s, i) => {
             const len = (s.share / 100) * C;
@@ -309,7 +309,7 @@ export function DonutChart({ items, max = 8, unit = '' }: { items: DonutItem[]; 
         </g>
       </svg>
 
-      <div style={{ flex: '1 1 220px', minWidth: 0, display: 'grid', gap: 7 }}>
+      <div style={{ flex: '1 1 180px', minWidth: 0, maxWidth: '100%', display: 'grid', gap: 7 }}>
         {slices.map((s, i) => (
           <div
             key={s.name}
@@ -371,8 +371,8 @@ export function Heatmap({ cells }: { cells: { weekday: number; hour: number; val
   const byKey = new Map(cells.map((c) => [`${c.weekday}:${c.hour}`, c.value]));
 
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table className="heatmap">
+    <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <table className="heatmap" style={{ minWidth: 460 }}>
         <thead>
           <tr>
             <th />

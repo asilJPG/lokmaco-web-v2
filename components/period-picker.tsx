@@ -40,11 +40,11 @@ export function PeriodPicker({ from, to, activePreset }: { from: string; to: str
           </button>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
         <input
           type="date"
           className="input input--inline"
-          style={{ width: 'auto' }}
+          style={{ width: 'auto', minWidth: 125, maxWidth: '100%' }}
           value={from}
           onChange={(e) => go({ from: e.target.value, to, preset: '' })}
         />
@@ -52,7 +52,7 @@ export function PeriodPicker({ from, to, activePreset }: { from: string; to: str
         <input
           type="date"
           className="input input--inline"
-          style={{ width: 'auto' }}
+          style={{ width: 'auto', minWidth: 125, maxWidth: '100%' }}
           value={to}
           onChange={(e) => go({ from, to: e.target.value, preset: '' })}
         />

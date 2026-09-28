@@ -188,7 +188,7 @@ export function DishesTab({ from, to }: { from: string; to: string }) {
             placeholder="Поиск блюда…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{ minWidth: 180 }}
+            style={{ minWidth: 140, flex: '1 1 140px' }}
           />
           <div style={{ display: 'flex', gap: 4 }}>
             {(['all', 'A', 'B', 'C'] as const).map((c) => (

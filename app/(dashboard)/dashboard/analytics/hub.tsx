@@ -57,19 +57,21 @@ export function AnalyticsHub({ from, to, role }: { from: string; to: string; rol
 
   return (
     <div className="grid">
-      <div className="segmented" role="tablist">
-        {visible.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            className="segmented__item"
-            onClick={() => select(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: 2 }}>
+        <div className="segmented" role="tablist">
+          {visible.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className="segmented__item"
+              onClick={() => select(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'overview' && <OverviewTab from={from} to={to} />}

@@ -97,7 +97,7 @@ export function IikoTabs({ from, to, tab }: { from: string; to: string; tab: Iik
               <div className="stat-card"><div className="stat-card__label">💰 Выручка</div><div className="stat-card__value" style={{ color: 'var(--success)' }}>{fmt(Math.round(pl.revenue))}</div></div>
               <div className="stat-card"><div className="stat-card__label">🛒 Себестоимость</div><div className="stat-card__value">{fmt(Math.round(pl.cogs))}</div></div>
               <div className="stat-card"><div className="stat-card__label">🏦 Операционные расходы</div><div className="stat-card__value">{fmt(Math.round(pl.expensesSum))}</div></div>
-              <div className="stat-card" style={{ gridColumn: 'span 2' }}>
+              <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
                 <div className="stat-card__label">📈 Чистая прибыль · маржа {pl.margin.toFixed(1)}%</div>
                 <div className="stat-card__value" style={{ color: pl.netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmt(Math.round(pl.netProfit))}</div>
               </div>
@@ -121,12 +121,12 @@ export function IikoTabs({ from, to, tab }: { from: string; to: string; tab: Iik
                           {isOpen && (
                             <tr>
                               <td colSpan={2} style={{ padding: 0, borderBottom: '1px solid var(--border)', background: 'var(--surface-muted)' }}>
-                                <div style={{ padding: '8px 16px 12px' }}>
+                                <div style={{ padding: '8px 12px 12px', width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                                   {detail === 'loading' && <div className="empty-state" style={{ padding: 8 }}>Загрузка…</div>}
                                   {detail === 'error' && <div className="banner banner--warn">Не удалось загрузить детализацию</div>}
                                   {Array.isArray(detail) && detail.length === 0 && <div className="empty-state" style={{ padding: 8 }}>Записей нет</div>}
                                   {Array.isArray(detail) && detail.length > 0 && (
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                    <table style={{ width: '100%', minWidth: 320, borderCollapse: 'collapse', fontSize: 12 }}>
                                       <thead>
                                         <tr style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase' }}>
                                           <th style={{ padding: '6px 8px', textAlign: 'left' }}>Дата</th>
@@ -188,18 +188,20 @@ export function IikoTabs({ from, to, tab }: { from: string; to: string; tab: Iik
                       <div style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(Math.round(cat.totalRevenue))}</div>
                     </div>
                   </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <tbody>
-                  {(openCats[cat.name] ? cat.dishes : cat.dishes.slice(0, VISIBLE_DISHES)).map((d, i) => (
-                    <tr key={d.name + i} style={{ borderTop: '1px solid var(--border)' }}>
-                      <td style={{ padding: '8px 16px', width: 32, color: 'var(--text-faint)', fontSize: 11 }}>{i + 1}</td>
-                      <td style={{ padding: '8px 16px' }}>{d.name}</td>
-                      <td style={{ padding: '8px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: 80 }}>{fmt(d.amount)}</td>
-                      <td style={{ padding: '8px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: 120, color: 'var(--text-muted)' }}>{fmt(Math.round(d.revenue))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: 320, borderCollapse: 'collapse', fontSize: 13 }}>
+                  <tbody>
+                    {(openCats[cat.name] ? cat.dishes : cat.dishes.slice(0, VISIBLE_DISHES)).map((d, i) => (
+                      <tr key={d.name + i} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '8px 16px', width: 32, color: 'var(--text-faint)', fontSize: 11 }}>{i + 1}</td>
+                        <td style={{ padding: '8px 16px' }}>{d.name}</td>
+                        <td style={{ padding: '8px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: 80 }}>{fmt(d.amount)}</td>
+                        <td style={{ padding: '8px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', width: 120, color: 'var(--text-muted)' }}>{fmt(Math.round(d.revenue))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
                   {cat.dishes.length > VISIBLE_DISHES && (
                     /* Раньше здесь висело «… и ещё 56 позиций» без всякой
                        возможности их увидеть — а спрашивают обычно как раз

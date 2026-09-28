@@ -148,7 +148,7 @@ export function LiquidityTab() {
               {g.items.length} позиций · остаток <b style={{ fontFamily: 'var(--font-num)' }}>{fmt(g.balanceSum)}</b>
             </div>
             <SegmentBar segments={ORDER.map((s) => ({ value: g.byStatus[s].sum, color: COLOR[s], label: LABEL[s] }))} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 12, fontSize: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(80px, 100%), 1fr))', gap: 8, marginTop: 12, fontSize: 12 }}>
               {ORDER.map((s) => (
                 <div key={s}>
                   <div style={{ color: COLOR[s], fontWeight: 600 }}>{LABEL[s]}</div>
@@ -169,7 +169,7 @@ export function LiquidityTab() {
 
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-          <input className="input input--inline" placeholder="Поиск товара…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ minWidth: 180 }} />
+          <input className="input input--inline" placeholder="Поиск товара…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ minWidth: 140, flex: '1 1 140px' }} />
           <div style={{ display: 'flex', gap: 4 }}>
             <button type="button" className={`btn btn--sm ${filter === 'all' ? 'btn--soft' : ''}`} onClick={() => setFilter('all')}>Все</button>
             {ORDER.map((s) => (

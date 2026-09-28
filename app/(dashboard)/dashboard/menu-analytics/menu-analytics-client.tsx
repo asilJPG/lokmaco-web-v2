@@ -217,9 +217,9 @@ export function MenuAnalyticsClient() {
       <div className="card" style={{ padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
           {/* Переключатель сайтов */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>Сайт меню:</span>
-            <div style={{ display: 'inline-flex', background: 'var(--surface-muted)', borderRadius: 8, padding: 3, gap: 4 }}>
+            <div style={{ display: 'inline-flex', flexWrap: 'wrap', background: 'var(--surface-muted)', borderRadius: 8, padding: 3, gap: 4, maxWidth: '100%' }}>
               {(['all', 'lokmaco', 'luma_garden'] as const).map((sId) => {
                 const cfg = SITE_CONFIG[sId] || { label: sId, icon: '📄', color: 'var(--accent)' };
                 const isActive = selectedSite === sId;
@@ -253,8 +253,8 @@ export function MenuAnalyticsClient() {
           </div>
 
           {/* Переключатель периода */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <div style={{ display: 'inline-flex', background: 'var(--surface-muted)', borderRadius: 8, padding: 3, gap: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
+            <div style={{ display: 'inline-flex', flexWrap: 'wrap', background: 'var(--surface-muted)', borderRadius: 8, padding: 3, gap: 2, maxWidth: '100%' }}>
               {[
                 { id: 'today', label: 'Сегодня' },
                 { id: '7d', label: '7 дней' },
@@ -290,7 +290,7 @@ export function MenuAnalyticsClient() {
             </div>
 
             {/* Произвольные даты */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', maxWidth: '100%' }}>
               <input
                 type="date"
                 className="input input--sm"
@@ -299,7 +299,7 @@ export function MenuAnalyticsClient() {
                   setCustomFrom(e.target.value);
                   setIsCustom(true);
                 }}
-                style={{ width: 130, fontSize: 12, padding: '4px 8px' }}
+                style={{ width: 'auto', minWidth: 125, maxWidth: '100%', fontSize: 12, padding: '4px 8px' }}
               />
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
               <input
@@ -310,7 +310,7 @@ export function MenuAnalyticsClient() {
                   setCustomTo(e.target.value);
                   setIsCustom(true);
                 }}
-                style={{ width: 130, fontSize: 12, padding: '4px 8px' }}
+                style={{ width: 'auto', minWidth: 125, maxWidth: '100%', fontSize: 12, padding: '4px 8px' }}
               />
               {isCustom && (
                 <button
@@ -328,7 +328,7 @@ export function MenuAnalyticsClient() {
       </div>
 
       {/* Сводные карточки ключевых метрик */}
-      <div className="grid grid--4" style={{ gap: 12 }}>
+      <div className="grid grid--4" style={{ gap: 12, minWidth: 0, maxWidth: '100%' }}>
         <div className="stat-card">
           <div className="stat-card__label">👥 Уникальные посетители</div>
           <div className="stat-card__value" style={{ color: 'var(--accent)' }}>
