@@ -5,7 +5,17 @@ import { useState, useTransition } from 'react';
 
 type Filial = { id: number; name: string };
 
-export function FilialSwitcher({ filials, current, allowAll }: { filials: Filial[]; current: number | 'all'; allowAll: boolean }) {
+export function FilialSwitcher({
+  filials,
+  current,
+  allowAll,
+  compact = false,
+}: {
+  filials: Filial[];
+  current: number | 'all';
+  allowAll: boolean;
+  compact?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [, start] = useTransition();
@@ -28,6 +38,33 @@ export function FilialSwitcher({ filials, current, allowAll }: { filials: Filial
       return;
     }
     start(() => router.refresh());
+  }
+
+  if (compact) {
+    return (
+      <div className="filial-switcher filial-switcher--compact" style={{ display: 'inline-flex', alignItems: 'center' }}>
+        <select
+          value={String(current)}
+          onChange={(e) => switchTo(e.target.value)}
+          disabled={busy}
+          style={{
+            padding: '5px 8px',
+            background: 'var(--surface-muted)',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          {allowAll && filials.length > 1 && <option value="all">Все филиалы</option>}
+          {filials.map((f) => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+      </div>
+    );
   }
 
   return (

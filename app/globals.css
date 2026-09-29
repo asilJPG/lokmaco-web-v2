@@ -137,6 +137,7 @@ button:focus-visible, a:focus-visible {
   color: var(--text);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 9px;
 }
 .app-sidebar__mark {
@@ -1215,9 +1216,51 @@ tr[data-today="true"] td:first-child {
   .modal-foot .btn { flex: 1; min-height: 44px; }
 }
 
-/* ---------------- Dark theme (auto via prefers-color-scheme) ---------------- */
+/* ---------------- Dark theme (explicit [data-theme="dark"] or auto via prefers-color-scheme) ---------------- */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1120;
+  --surface: #111827;
+  --surface-muted: #1f2937;
+  --border: #1f2937;
+  --border-strong: #334155;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --text-faint: #6b7280;
+  --brand: #0b1120;
+  --brand-hover: #111827;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.14);
+  --success: #4ade80;
+  --success-soft: rgba(74, 222, 128, 0.12);
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] .badge--warning { background: rgba(251, 191, 36, 0.14); color: var(--warning); }
+html[data-theme="dark"] .badge--danger { background: rgba(248, 113, 113, 0.14); color: var(--danger); }
+html[data-theme="dark"] .banner--info { background: rgba(37, 99, 235, 0.14); color: #93c5fd; border-color: rgba(37, 99, 235, 0.35); }
+html[data-theme="dark"] .banner--warn { background: rgba(217, 119, 6, 0.12); color: #fcd34d; border-color: rgba(217, 119, 6, 0.35); }
+html[data-theme="dark"] .banner--error { background: rgba(220, 38, 38, 0.12); color: #fca5a5; border-color: rgba(220, 38, 38, 0.35); }
+html[data-theme="dark"] .banner--success { background: rgba(22, 163, 74, 0.12); color: #86efac; border-color: rgba(22, 163, 74, 0.35); }
+html[data-theme="dark"] tr[data-today="true"] td { background: rgba(250, 204, 21, 0.08); }
+html[data-theme="dark"] .card tbody tr[data-today="true"]:hover td { background: rgba(250, 204, 21, 0.14); }
+html[data-theme="dark"] .btn--danger { background: var(--surface); border-color: rgba(248, 113, 113, 0.4); }
+html[data-theme="dark"] .btn--danger:hover { background: rgba(248, 113, 113, 0.08); }
+html[data-theme="dark"] .btn--primary:hover { background: #4f95f7; border-color: #4f95f7; }
+html[data-theme="dark"] .btn--soft:hover { background: rgba(96, 165, 250, 0.22); }
+html[data-theme="dark"] .app-sidebar__mark { background: var(--accent); color: #0b1120; }
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #0b1120;
     --surface: #111827;
     --surface-muted: #1f2937;
@@ -1229,8 +1272,6 @@ tr[data-today="true"] td:first-child {
     --brand: #0b1120;
     --brand-hover: #111827;
     --accent: #60a5fa;
-    /* Tints have to be re-derived for dark mode: the light ones would render as
-       bright blocks instead of a subtle wash. */
     --accent-soft: rgba(96, 165, 250, 0.14);
     --success: #4ade80;
     --success-soft: rgba(74, 222, 128, 0.12);
@@ -1240,19 +1281,109 @@ tr[data-today="true"] td:first-child {
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55);
   }
-  .badge--warning { background: rgba(251, 191, 36, 0.14); color: var(--warning); }
-  .badge--danger { background: rgba(248, 113, 113, 0.14); color: var(--danger); }
-  .banner--info { background: rgba(37, 99, 235, 0.14); color: #93c5fd; border-color: rgba(37, 99, 235, 0.35); }
-  .banner--warn { background: rgba(217, 119, 6, 0.12); color: #fcd34d; border-color: rgba(217, 119, 6, 0.35); }
-  .banner--error { background: rgba(220, 38, 38, 0.12); color: #fca5a5; border-color: rgba(220, 38, 38, 0.35); }
-  .banner--success { background: rgba(22, 163, 74, 0.12); color: #86efac; border-color: rgba(22, 163, 74, 0.35); }
-  tr[data-today="true"] td { background: rgba(250, 204, 21, 0.08); }
-  .card tbody tr[data-today="true"]:hover td { background: rgba(250, 204, 21, 0.14); }
-  .btn--danger { background: var(--surface); border-color: rgba(248, 113, 113, 0.4); }
-  .btn--danger:hover { background: rgba(248, 113, 113, 0.08); }
-  .btn--primary:hover { background: #4f95f7; border-color: #4f95f7; }
-  .btn--soft:hover { background: rgba(96, 165, 250, 0.22); }
-  .app-sidebar__mark { background: var(--accent); }
+  html:not([data-theme="light"]) .badge--warning { background: rgba(251, 191, 36, 0.14); color: var(--warning); }
+  html:not([data-theme="light"]) .badge--danger { background: rgba(248, 113, 113, 0.14); color: var(--danger); }
+  html:not([data-theme="light"]) .banner--info { background: rgba(37, 99, 235, 0.14); color: #93c5fd; border-color: rgba(37, 99, 235, 0.35); }
+  html:not([data-theme="light"]) .banner--warn { background: rgba(217, 119, 6, 0.12); color: #fcd34d; border-color: rgba(217, 119, 6, 0.35); }
+  html:not([data-theme="light"]) .banner--error { background: rgba(220, 38, 38, 0.12); color: #fca5a5; border-color: rgba(220, 38, 38, 0.35); }
+  html:not([data-theme="light"]) .banner--success { background: rgba(22, 163, 74, 0.12); color: #86efac; border-color: rgba(22, 163, 74, 0.35); }
+  html:not([data-theme="light"]) tr[data-today="true"] td { background: rgba(250, 204, 21, 0.08); }
+  html:not([data-theme="light"]) .card tbody tr[data-today="true"]:hover td { background: rgba(250, 204, 21, 0.14); }
+  html:not([data-theme="light"]) .btn--danger { background: var(--surface); border-color: rgba(248, 113, 113, 0.4); }
+  html:not([data-theme="light"]) .btn--danger:hover { background: rgba(248, 113, 113, 0.08); }
+  html:not([data-theme="light"]) .btn--primary:hover { background: #4f95f7; border-color: #4f95f7; }
+  html:not([data-theme="light"]) .btn--soft:hover { background: rgba(96, 165, 250, 0.22); }
+  html:not([data-theme="light"]) .app-sidebar__mark { background: var(--accent); color: #0b1120; }
+}
+
+/* ---------------- Theme Toggle Button ---------------- */
+.theme-toggle-btn {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  min-height: 34px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+.theme-toggle-btn:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--accent);
+}
+.theme-toggle-btn--compact {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.theme-toggle-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------------- Sidebar Collapse on Desktop ---------------- */
+.sidebar-collapse-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.sidebar-collapse-btn:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.desktop-collapsed-bar {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  html[data-sidebar-collapsed="true"] .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-sidebar-collapsed="true"] .app-sidebar {
+    display: none !important;
+  }
+  html[data-sidebar-collapsed="true"] .desktop-collapsed-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: var(--space-5);
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar-collapse-btn,
+  .desktop-collapsed-bar {
+    display: none !important;
+  }
 }
 
 /* ---------------- Print-friendly styles ---------------- */

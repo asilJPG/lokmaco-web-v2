@@ -7,6 +7,8 @@ import { FilialSwitcher } from '@/components/filial-switcher';
 import { LogoutButton } from '@/components/logout-button';
 import { CommandPalette } from '@/components/command-palette';
 import { MobileTabBar, MobileTopBar } from '@/components/mobile-chrome';
+import { SidebarCollapseButton, DesktopCollapsedBar } from '@/components/sidebar-toggle';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { and, inArray, or, eq, sql } from 'drizzle-orm';
 import { db, schema } from '@/db/client';
 
@@ -51,8 +53,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="app-shell">
       <aside className="app-sidebar">
         <div className="app-sidebar__brand">
-          <span className="app-sidebar__mark" aria-hidden="true">L</span>
-          <span>Lokmaco</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <span className="app-sidebar__mark" aria-hidden="true">L</span>
+            <span>Lokmaco</span>
+          </div>
+          <SidebarCollapseButton />
         </div>
         <FilialSwitcher filials={filials} current={current} allowAll={allowAll} />
         <SidebarNav role={session.role} permissions={userPermissions} badges={{ inbox: inboxCount }} />
@@ -68,11 +73,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <div className="app-sidebar__user-name">{session.name}</div>
             <div>{session.role}</div>
           </div>
-          <LogoutButton />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%' }}>
+            <ThemeToggle />
+            <LogoutButton />
+          </div>
         </div>
       </aside>
       <MobileTopBar filials={filials} current={current} allowAll={allowAll} userName={session.name} />
-      <main className="app-main">{children}</main>
+      <main className="app-main">
+        <DesktopCollapsedBar filials={filials} current={current} allowAll={allowAll} userName={session.name} />
+        {children}
+      </main>
       <MobileTabBar role={session.role} permissions={userPermissions} badges={{ inbox: inboxCount }} />
       <CommandPalette role={session.role} permissions={userPermissions} />
     </div>

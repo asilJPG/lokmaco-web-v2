@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { canAccess, type Section } from '@/lib/access';
+import { ThemeToggle } from './theme-toggle';
 
 type Tab = { href: string; label: string; icon: string; section: Section; badgeKey?: 'inbox' };
 
@@ -174,9 +175,12 @@ export function MobileTopBar({
         ) : (
           <span className="mobile-topbar__filial mobile-topbar__filial--static">{currentName}</span>
         )}
-        <Link href="/dashboard/profile" className="mobile-topbar__user" aria-label={`Профиль: ${userName}`}>
-          {userName.trim().charAt(0).toUpperCase() || '?'}
-        </Link>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ThemeToggle compact />
+          <Link href="/dashboard/profile" className="mobile-topbar__user" aria-label={`Профиль: ${userName}`}>
+            {userName.trim().charAt(0).toUpperCase() || '?'}
+          </Link>
+        </div>
       </header>
 
       {open && (

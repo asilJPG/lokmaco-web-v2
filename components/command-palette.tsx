@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { canAccess, sectionForHref, type Section } from '@/lib/access';
+import { toggleGlobalTheme } from './theme-toggle';
+import { toggleGlobalSidebar } from './sidebar-toggle';
 
 type Item = { href: string; label: string; icon: string; group: string; section?: Section };
 
@@ -40,6 +42,8 @@ const ITEMS: Item[] = [
   { href: '/dashboard/assets', label: 'Опись ОС', icon: '🏛', group: 'Склад' },
   { href: '/dashboard/reconciliation', label: 'Отчёты кассы', icon: '🧮', group: 'Финансы' },
   { href: '/dashboard/tax-report', label: 'Налоговый отчёт', icon: '🧾', group: 'Финансы' },
+  { href: '#theme', label: 'Переключить тему (Светлая / Тёмная)', icon: '🌓', group: 'Интерфейс' },
+  { href: '#sidebar', label: 'Скрыть / показать боковое меню (⌘B)', icon: '◨', group: 'Интерфейс' },
 ];
 
 function fuzzyMatch(haystack: string, needle: string): boolean {
@@ -114,10 +118,24 @@ export function CommandPalette({
     if (active >= filtered.length) setActive(0);
   }, [filtered.length, active]);
 
+  useEffect(() => {
+    function onOpen() { setOpen(true); }
+    window.addEventListener('open-cmdk', onOpen);
+    return () => window.removeEventListener('open-cmdk', onOpen);
+  }, []);
+
   if (!enabled || !open) return null;
 
   function go(href: string) {
     setOpen(false);
+    if (href === '#theme') {
+      toggleGlobalTheme();
+      return;
+    }
+    if (href === '#sidebar') {
+      toggleGlobalSidebar();
+      return;
+    }
     router.push(href);
   }
 
