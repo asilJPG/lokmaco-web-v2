@@ -48,6 +48,7 @@ export async function GET() {
         id: r.id,
         date: String(d.date || ''),
         leftover: num(d.leftover),
+        repaid: num(d.repaid),
         comment: String(d.comment || ''),
         by: r.userName || '',
       };
@@ -130,6 +131,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const date = String(body.date || '').trim();
   const leftover = num(body.leftover);
+  const repaid = num(body.repaid);
   const comment = String(body.comment || '').trim();
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -140,6 +142,9 @@ export async function POST(req: Request) {
   }
   if (leftover < 0) {
     return Response.json({ error: 'Остаток не может быть отрицательным' }, { status: 400 });
+  }
+  if (repaid < 0) {
+    return Response.json({ error: 'Погашение долга не может быть отрицательным' }, { status: 400 });
   }
 
   const filialId = filialIds[0];
@@ -162,6 +167,7 @@ export async function POST(req: Request) {
           ...prev,
           date,
           leftover,
+          repaid,
           comment: comment || prev.comment || '',
           deleted_at: null,
           deleted_by: null,
@@ -181,7 +187,7 @@ export async function POST(req: Request) {
     userName: session.name,
     actionType: 'bazaar_balance',
     documentNumber: date,
-    details: { date, leftover, comment },
+    details: { date, leftover, repaid, comment },
   }).returning({ id: schema.botActions.id });
 
   return Response.json({ success: true, id: row.id });

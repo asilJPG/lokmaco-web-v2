@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { BazaarWindow } from '@/lib/bazaar';
 
-type Mark = { id: number; date: string; leftover: number; comment: string; by: string };
+type Mark = { id: number; date: string; leftover: number; repaid: number; comment: string; by: string };
 type Data = { windows: BazaarWindow[]; marks: Mark[] };
 
 function fmtMoney(n: number): string {
@@ -25,6 +25,7 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
     return now.toISOString().slice(0, 10);
   });
   const [leftover, setLeftover] = useState('');
+  const [repaid, setRepaid] = useState('');
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
@@ -53,7 +54,7 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
       const res = await fetch('/api/bazaar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, leftover: Number(leftover), comment }),
+        body: JSON.stringify({ date, leftover: Number(leftover), repaid: Number(repaid) || 0, comment }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
@@ -61,6 +62,7 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
       const now = new Date(Date.now() + 5 * 3600_000);
       setDate(now.toISOString().slice(0, 10));
       setLeftover('');
+      setRepaid('');
       setComment('');
       load();
     } catch (e: any) {
@@ -88,7 +90,7 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
   const statusLabel: Record<string, string> = {
     ok: 'Сошлось',
     missing: 'Не хватает накладных',
-    over: 'Накладных больше',
+    over: 'Привёз в долг',
   };
   const statusColor: Record<string, string> = {
     ok: 'var(--green)',
@@ -111,6 +113,13 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
             <input type="number" min="0" step="1" value={leftover}
               onChange={e => setLeftover(e.target.value)}
               required className="input" style={{ width: 160 }} placeholder="0" />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+            Погасил долг (сум)
+            <input type="number" min="0" step="1" value={repaid}
+              onChange={e => setRepaid(e.target.value)}
+              className="input" style={{ width: 160 }} placeholder="0"
+              title="Сколько налички ушло на погашение старого долга снабженца в этот день" />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, flex: 1, minWidth: 140 }}>
             Комментарий
@@ -150,6 +159,19 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
                 Потрачено {fmtMoney(w.spent)} · Накладных {fmtMoney(w.entered)} ({w.invoiceCount} шт.)
               </div>
+              {(w.inDebt > 0 || w.repaid > 0 || w.debtAfter !== 0) && (
+                <div style={{ fontSize: 12, marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {w.inDebt > 0 && (
+                    <span style={{ color: 'var(--orange, #e67e22)' }}>в долг +{fmtMoney(w.inDebt)}</span>
+                  )}
+                  {w.repaid > 0 && (
+                    <span style={{ color: 'var(--green)' }}>погашено −{fmtMoney(w.repaid)}</span>
+                  )}
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    долг снабженца: <b style={{ color: w.debtAfter > 0 ? 'var(--orange, #e67e22)' : 'var(--text)' }}>{fmtMoney(w.debtAfter)}</b>
+                  </span>
+                </div>
+              )}
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{
@@ -164,7 +186,7 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
                 {statusLabel[w.status]}
                 {w.status !== 'ok' && (
                   <span style={{ fontWeight: 400, fontSize: 13 }}>
-                    ({fmtMoney(Math.abs(w.diff))})
+                    ({fmtMoney(w.status === 'over' ? w.inDebt : w.shortfall)})
                   </span>
                 )}
               </div>
@@ -199,6 +221,31 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
                   <div className="stat-card__label" style={{ fontSize: 11 }}>Потрачено на закуп</div>
                   <div className="stat-card__value" style={{ fontSize: 16, fontWeight: 700 }}>{fmtMoney(w.spent)}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>было + выдали − осталось</div>
+                </div>
+                {w.repaid > 0 && (
+                  <div className="stat-card" style={{ padding: 12 }}>
+                    <div className="stat-card__label" style={{ fontSize: 11 }}>Погашено долга</div>
+                    <div className="stat-card__value" style={{ fontSize: 16, color: 'var(--green)' }}>{fmtMoney(w.repaid)}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>деньгами в этот период</div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                padding: '10px 12px', marginBottom: 12, borderRadius: 8,
+                background: 'var(--surface-2, rgba(0,0,0,0.03))',
+              }}>
+                <div style={{ fontSize: 13 }}>
+                  {w.inDebt > 0 && <span style={{ color: 'var(--orange, #e67e22)' }}>Привёз в долг на {fmtMoney(w.inDebt)}. </span>}
+                  {w.shortfall > 0 && <span style={{ color: 'var(--red)' }}>Не хватает накладных на {fmtMoney(w.shortfall)}. </span>}
+                  {w.inDebt === 0 && w.shortfall === 0 && <span style={{ color: 'var(--green)' }}>Накладные сошлись с потраченным. </span>}
+                </div>
+                <div style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
+                  Долг снабженца:{' '}
+                  <b style={{ color: w.debtAfter > 0 ? 'var(--orange, #e67e22)' : w.debtAfter < 0 ? 'var(--green)' : 'var(--text)' }}>
+                    {fmtMoney(w.debtAfter)}
+                  </b>
                 </div>
               </div>
 
@@ -263,6 +310,7 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
               <tr style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase' }}>
                 <th style={{ padding: '8px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Дата</th>
                 <th style={{ padding: '8px 0', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Остаток</th>
+                <th style={{ padding: '8px 0', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Погашено</th>
                 <th style={{ padding: '8px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Кто</th>
                 <th style={{ padding: '8px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Комментарий</th>
                 {isAdmin && (
@@ -276,6 +324,9 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
                   <td style={{ padding: '8px 0' }}>{fmtDate(m.date)}</td>
                   <td style={{ padding: '8px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
                     {fmtMoney(m.leftover)}
+                  </td>
+                  <td style={{ padding: '8px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: m.repaid ? 'var(--green)' : 'var(--text-muted)' }}>
+                    {m.repaid ? fmtMoney(m.repaid) : '—'}
                   </td>
                   <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>{m.by}</td>
                   <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>{m.comment || '—'}</td>
