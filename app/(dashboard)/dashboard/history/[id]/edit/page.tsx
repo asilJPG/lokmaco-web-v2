@@ -14,7 +14,8 @@ export const dynamic = 'force-dynamic';
 export default async function EditShiftPage({ params }: { params: { id: string } }) {
   const session = await getSession();
   if (!session) redirect('/');
-  if (baseRole(session.role) !== 'admin') redirect('/dashboard/history');
+  const role = baseRole(session.role);
+  if (role !== 'admin' && role !== 'director') redirect('/dashboard/history');
 
   const filialIds = await getCurrentFilialIds();
   if (filialIds.length === 0) notFound();

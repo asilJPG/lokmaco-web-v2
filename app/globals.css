@@ -1,32 +1,31 @@
 :root {
-  --bg: #f7f8fa;
+  --bg: #f5f5f7;
   --surface: #ffffff;
-  --surface-muted: #f2f4f7;
-  --border: #eaecf0;
-  --border-strong: #d0d5dd;
-  --text: #101828;
-  --text-muted: #667085;
-  --text-faint: #98a2b3;
-  --brand: #101828;
-  --brand-hover: #1d2939;
-  --accent: #2f6fed;
-  --accent-soft: #eef4ff;
-  --success: #12904f;
-  --success-soft: #e9f7ef;
-  --danger: #d92d20;
-  --warning: #dc6803;
+  --surface-muted: #ebebed;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --text: #111111;
+  --text-muted: #6e6e73;
+  --text-faint: #86868b;
+  --brand: #111111;
+  --brand-hover: #1c1c1e;
+  --accent: #0071e3;
+  --accent-soft: rgba(0, 113, 227, 0.08);
+  --success: #34c759;
+  --success-soft: rgba(52, 199, 89, 0.10);
+  --danger: #ff3b30;
+  --warning: #ff9500;
 
-  --radius-sm: 8px;
-  --radius: 12px;
-  --radius-lg: 16px;
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 22px;
 
-  /* Flat, low-contrast elevation: the layout reads through borders and
-     background steps rather than drop shadows. */
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
-  --shadow-md: 0 8px 20px rgba(16, 24, 40, 0.08);
+  /* Apple HIG multi-stop elevation: soft organic shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
 
-  --font-num: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --font-num: -apple-system, BlinkMacSystemFont, ui-monospace, SFMono-Regular, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -42,7 +41,9 @@ html, body {
   margin: 0;
   padding: 0;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
+  height: 100vh;
+  overflow-y: hidden;
 }
 html { color-scheme: light dark; }
 body {
@@ -113,9 +114,10 @@ button:focus-visible, a:focus-visible {
 .app-shell {
   display: grid;
   grid-template-columns: 268px minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .app-sidebar {
@@ -125,9 +127,10 @@ button:focus-visible, a:focus-visible {
   display: flex;
   flex-direction: column;
   padding: var(--space-4) var(--space-3);
-  position: sticky;
-  top: 0;
   height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  z-index: 10;
 }
 .app-sidebar__brand {
   padding: 4px var(--space-3) var(--space-5);
@@ -218,7 +221,11 @@ button:focus-visible, a:focus-visible {
   padding: var(--space-6);
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: clip;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ---------------- Мобильная оболочка ----------------
@@ -229,11 +236,16 @@ button:focus-visible, a:focus-visible {
 .mobile-topbar, .mobile-tabbar { display: none; }
 
 @media (max-width: 768px) {
+  html, body { height: auto; overflow-y: visible; }
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 1fr;
     max-width: 100vw;
-    overflow-x: hidden;
+    height: auto;
+    min-height: 100vh;
+    max-height: none;
+    overflow: visible;
+    overflow-x: clip;
   }
   /* Боковое меню — только для десктопа. На телефоне навигацию рисует
      components/mobile-chrome.tsx. */
@@ -245,7 +257,10 @@ button:focus-visible, a:focus-visible {
     padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px) + var(--space-4));
     min-width: 0;
     max-width: 100vw;
-    overflow-x: hidden;
+    height: auto;
+    max-height: none;
+    overflow-y: visible;
+    overflow-x: clip;
   }
 
   .mobile-topbar {
@@ -258,8 +273,9 @@ button:focus-visible, a:focus-visible {
     height: calc(52px + env(safe-area-inset-top, 0px));
     padding: env(safe-area-inset-top, 0px) var(--space-3) 0;
     border-bottom: 1px solid var(--border);
-    background: color-mix(in srgb, var(--surface) 92%, transparent);
-    backdrop-filter: saturate(180%) blur(10px);
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
   }
   .mobile-topbar__mark {
     width: 28px; height: 28px;
@@ -273,7 +289,7 @@ button:focus-visible, a:focus-visible {
   .mobile-topbar__filial {
     display: flex; align-items: center; gap: 6px;
     min-height: 36px;
-    padding: 6px 12px;
+    padding: 6px 14px;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: var(--surface-muted);
@@ -281,7 +297,9 @@ button:focus-visible, a:focus-visible {
     font-size: 14px; font-weight: 600;
     max-width: 60vw;
     cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   }
+  .mobile-topbar__filial:active { transform: scale(0.96); }
   .mobile-topbar__filial--static { cursor: default; }
   .mobile-topbar__filial-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-topbar__user {
@@ -293,7 +311,9 @@ button:focus-visible, a:focus-visible {
     display: grid; place-items: center;
     font-weight: 700; font-size: 14px;
     flex-shrink: 0;
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   }
+  .mobile-topbar__user:active { transform: scale(0.92); }
 
   .mobile-tabbar {
     display: grid;
@@ -302,9 +322,10 @@ button:focus-visible, a:focus-visible {
     z-index: 12;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     border-top: 1px solid var(--border);
-    background: color-mix(in srgb, var(--surface) 94%, transparent);
-    backdrop-filter: saturate(180%) blur(10px);
-    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
   }
   .mobile-tab {
     /* 60px по высоте — комфортная цель для пальца, подпись при этом читается. */
@@ -317,12 +338,13 @@ button:focus-visible, a:focus-visible {
     font-size: 11px; font-weight: 500;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .mobile-tab__icon { font-size: 20px; line-height: 1; position: relative; }
+  .mobile-tab__icon { font-size: 20px; line-height: 1; position: relative; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
   .mobile-tab__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-  .mobile-tab[data-active="true"] { color: var(--accent); }
-  .mobile-tab[data-active="true"] .mobile-tab__icon { transform: translateY(-1px); }
-  .mobile-tab:active { background: var(--surface-muted); }
+  .mobile-tab[data-active="true"] { color: var(--accent); font-weight: 600; }
+  .mobile-tab[data-active="true"] .mobile-tab__icon { transform: translateY(-2px) scale(1.08); }
+  .mobile-tab:active { transform: scale(0.92); }
   .mobile-tab__badge {
     position: absolute;
     top: -6px; left: 12px;
@@ -507,12 +529,21 @@ button:focus-visible, a:focus-visible {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-5);
-  transition: box-shadow 160ms, border-color 160ms;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
 }
-a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+@keyframes login-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.login-card--shake {
+  animation: login-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
 .card__title {
   font-size: 14px;
   font-weight: 600;
@@ -540,13 +571,13 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
 .textarea,
 .select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px 14px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
   font-size: 14px;
   color: var(--text);
-  transition: border-color 120ms, box-shadow 120ms;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .select {
   appearance: none;
@@ -563,7 +594,7 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
 .select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 3.5px var(--accent-soft);
 }
 .input:hover:not(:focus):not(:disabled):not(:read-only),
 .textarea:hover:not(:focus):not(:disabled):not(:read-only),
@@ -619,22 +650,21 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: 9px 16px;
-  border: 1px solid transparent;
-  border-radius: 10px;
+  padding: 9px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   font-weight: 500;
   font-size: 14px;
-  transition: background 120ms, border-color 120ms, color 120ms, transform 60ms;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   background: var(--surface);
   color: var(--text);
-  border-color: var(--border-strong);
-  min-height: 40px;
+  min-height: 42px;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 .btn:hover { background: var(--surface-muted); border-color: var(--border-strong); }
-.btn:active { transform: translateY(1px); box-shadow: none; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn:active { transform: scale(0.97); box-shadow: none; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .btn:disabled:hover { background: var(--surface); border-color: var(--border-strong); }
 /* Primary reads as the accent colour, the way the reference dashboards do —
    the near-black variant is kept for destructive-adjacent emphasis only. */
@@ -643,8 +673,14 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
   border-color: var(--accent);
   color: #fff;
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 113, 227, 0.3);
 }
-.btn--primary:hover { background: #2560d4; border-color: #2560d4; }
+.btn--primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, black);
+  border-color: color-mix(in srgb, var(--accent) 88%, black);
+  box-shadow: 0 3px 8px rgba(0, 113, 227, 0.4);
+}
+.btn--primary:active { transform: scale(0.97); }
 /* Selected-filter look: tinted rather than filled, so a row of them doesn't
    turn into a wall of blue. */
 .btn--soft {
@@ -653,16 +689,16 @@ a.card:hover, button.card:hover { border-color: var(--border-strong); box-shadow
   color: var(--accent);
   font-weight: 600;
 }
-.btn--soft:hover { background: #e2ecff; border-color: transparent; }
+.btn--soft:hover { background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent)); border-color: transparent; }
 .btn--ghost { border-color: transparent; }
 .btn--ghost:hover { background: var(--surface-muted); }
 .btn--danger {
-  background: #fff;
+  background: var(--surface);
   color: var(--danger);
-  border-color: #fecaca;
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
 }
-.btn--danger:hover { background: #fef2f2; }
-.btn--sm { padding: 6px 12px; min-height: 34px; font-size: 13px; border-radius: 9px; }
+.btn--danger:hover { background: rgba(255, 59, 48, 0.08); }
+.btn--sm { padding: 6px 14px; min-height: 36px; font-size: 13px; border-radius: var(--radius-sm); }
 
 .tabs {
   display: flex;
@@ -1219,81 +1255,81 @@ tr[data-today="true"] td:first-child {
 /* ---------------- Dark theme (explicit [data-theme="dark"] or auto via prefers-color-scheme) ---------------- */
 html[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0b1120;
-  --surface: #111827;
-  --surface-muted: #1f2937;
-  --border: #1f2937;
-  --border-strong: #334155;
-  --text: #e5e7eb;
-  --text-muted: #9ca3af;
-  --text-faint: #6b7280;
-  --brand: #0b1120;
-  --brand-hover: #111827;
-  --accent: #60a5fa;
-  --accent-soft: rgba(96, 165, 250, 0.14);
-  --success: #4ade80;
-  --success-soft: rgba(74, 222, 128, 0.12);
-  --danger: #f87171;
-  --warning: #fbbf24;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55);
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-muted: #2c2c2e;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #f5f5f7;
+  --text-muted: #98989d;
+  --text-faint: #636366;
+  --brand: #ffffff;
+  --brand-hover: #e5e5ea;
+  --accent: #2997ff;
+  --accent-soft: rgba(41, 151, 255, 0.16);
+  --success: #30d158;
+  --success-soft: rgba(48, 209, 88, 0.14);
+  --danger: #ff453a;
+  --warning: #ffd60a;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.7);
 }
 
 html[data-theme="light"] {
   color-scheme: light;
 }
 
-html[data-theme="dark"] .badge--warning { background: rgba(251, 191, 36, 0.14); color: var(--warning); }
-html[data-theme="dark"] .badge--danger { background: rgba(248, 113, 113, 0.14); color: var(--danger); }
-html[data-theme="dark"] .banner--info { background: rgba(37, 99, 235, 0.14); color: #93c5fd; border-color: rgba(37, 99, 235, 0.35); }
-html[data-theme="dark"] .banner--warn { background: rgba(217, 119, 6, 0.12); color: #fcd34d; border-color: rgba(217, 119, 6, 0.35); }
-html[data-theme="dark"] .banner--error { background: rgba(220, 38, 38, 0.12); color: #fca5a5; border-color: rgba(220, 38, 38, 0.35); }
-html[data-theme="dark"] .banner--success { background: rgba(22, 163, 74, 0.12); color: #86efac; border-color: rgba(22, 163, 74, 0.35); }
-html[data-theme="dark"] tr[data-today="true"] td { background: rgba(250, 204, 21, 0.08); }
-html[data-theme="dark"] .card tbody tr[data-today="true"]:hover td { background: rgba(250, 204, 21, 0.14); }
-html[data-theme="dark"] .btn--danger { background: var(--surface); border-color: rgba(248, 113, 113, 0.4); }
-html[data-theme="dark"] .btn--danger:hover { background: rgba(248, 113, 113, 0.08); }
-html[data-theme="dark"] .btn--primary:hover { background: #4f95f7; border-color: #4f95f7; }
-html[data-theme="dark"] .btn--soft:hover { background: rgba(96, 165, 250, 0.22); }
-html[data-theme="dark"] .app-sidebar__mark { background: var(--accent); color: #0b1120; }
+html[data-theme="dark"] .badge--warning { background: rgba(255, 214, 10, 0.15); color: var(--warning); }
+html[data-theme="dark"] .badge--danger { background: rgba(255, 69, 58, 0.15); color: var(--danger); }
+html[data-theme="dark"] .banner--info { background: rgba(41, 151, 255, 0.14); color: #93c5fd; border-color: rgba(41, 151, 255, 0.35); }
+html[data-theme="dark"] .banner--warn { background: rgba(255, 214, 10, 0.12); color: #fcd34d; border-color: rgba(255, 214, 10, 0.35); }
+html[data-theme="dark"] .banner--error { background: rgba(255, 69, 58, 0.12); color: #fca5a5; border-color: rgba(255, 69, 58, 0.35); }
+html[data-theme="dark"] .banner--success { background: rgba(48, 209, 88, 0.12); color: #86efac; border-color: rgba(48, 209, 88, 0.35); }
+html[data-theme="dark"] tr[data-today="true"] td { background: rgba(255, 214, 10, 0.08); }
+html[data-theme="dark"] .card tbody tr[data-today="true"]:hover td { background: rgba(255, 214, 10, 0.14); }
+html[data-theme="dark"] .btn--danger { background: var(--surface); border-color: rgba(255, 69, 58, 0.4); }
+html[data-theme="dark"] .btn--danger:hover { background: rgba(255, 69, 58, 0.12); }
+html[data-theme="dark"] .btn--primary:hover { background: #38a1ff; border-color: #38a1ff; }
+html[data-theme="dark"] .btn--soft:hover { background: rgba(41, 151, 255, 0.24); }
+html[data-theme="dark"] .app-sidebar__mark { background: var(--accent); color: #000000; }
 
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0b1120;
-    --surface: #111827;
-    --surface-muted: #1f2937;
-    --border: #1f2937;
-    --border-strong: #334155;
-    --text: #e5e7eb;
-    --text-muted: #9ca3af;
-    --text-faint: #6b7280;
-    --brand: #0b1120;
-    --brand-hover: #111827;
-    --accent: #60a5fa;
-    --accent-soft: rgba(96, 165, 250, 0.14);
-    --success: #4ade80;
-    --success-soft: rgba(74, 222, 128, 0.12);
-    --danger: #f87171;
-    --warning: #fbbf24;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55);
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-muted: #2c2c2e;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #f5f5f7;
+    --text-muted: #98989d;
+    --text-faint: #636366;
+    --brand: #ffffff;
+    --brand-hover: #e5e5ea;
+    --accent: #2997ff;
+    --accent-soft: rgba(41, 151, 255, 0.16);
+    --success: #30d158;
+    --success-soft: rgba(48, 209, 88, 0.14);
+    --danger: #ff453a;
+    --warning: #ffd60a;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.7);
   }
-  html:not([data-theme="light"]) .badge--warning { background: rgba(251, 191, 36, 0.14); color: var(--warning); }
-  html:not([data-theme="light"]) .badge--danger { background: rgba(248, 113, 113, 0.14); color: var(--danger); }
-  html:not([data-theme="light"]) .banner--info { background: rgba(37, 99, 235, 0.14); color: #93c5fd; border-color: rgba(37, 99, 235, 0.35); }
-  html:not([data-theme="light"]) .banner--warn { background: rgba(217, 119, 6, 0.12); color: #fcd34d; border-color: rgba(217, 119, 6, 0.35); }
-  html:not([data-theme="light"]) .banner--error { background: rgba(220, 38, 38, 0.12); color: #fca5a5; border-color: rgba(220, 38, 38, 0.35); }
-  html:not([data-theme="light"]) .banner--success { background: rgba(22, 163, 74, 0.12); color: #86efac; border-color: rgba(22, 163, 74, 0.35); }
-  html:not([data-theme="light"]) tr[data-today="true"] td { background: rgba(250, 204, 21, 0.08); }
-  html:not([data-theme="light"]) .card tbody tr[data-today="true"]:hover td { background: rgba(250, 204, 21, 0.14); }
-  html:not([data-theme="light"]) .btn--danger { background: var(--surface); border-color: rgba(248, 113, 113, 0.4); }
-  html:not([data-theme="light"]) .btn--danger:hover { background: rgba(248, 113, 113, 0.08); }
-  html:not([data-theme="light"]) .btn--primary:hover { background: #4f95f7; border-color: #4f95f7; }
-  html:not([data-theme="light"]) .btn--soft:hover { background: rgba(96, 165, 250, 0.22); }
-  html:not([data-theme="light"]) .app-sidebar__mark { background: var(--accent); color: #0b1120; }
+  html:not([data-theme="light"]) .badge--warning { background: rgba(255, 214, 10, 0.15); color: var(--warning); }
+  html:not([data-theme="light"]) .badge--danger { background: rgba(255, 69, 58, 0.15); color: var(--danger); }
+  html:not([data-theme="light"]) .banner--info { background: rgba(41, 151, 255, 0.14); color: #93c5fd; border-color: rgba(41, 151, 255, 0.35); }
+  html:not([data-theme="light"]) .banner--warn { background: rgba(255, 214, 10, 0.12); color: #fcd34d; border-color: rgba(255, 214, 10, 0.35); }
+  html:not([data-theme="light"]) .banner--error { background: rgba(255, 69, 58, 0.12); color: #fca5a5; border-color: rgba(255, 69, 58, 0.35); }
+  html:not([data-theme="light"]) .banner--success { background: rgba(48, 209, 88, 0.12); color: #86efac; border-color: rgba(48, 209, 88, 0.35); }
+  html:not([data-theme="light"]) tr[data-today="true"] td { background: rgba(255, 214, 10, 0.08); }
+  html:not([data-theme="light"]) .card tbody tr[data-today="true"]:hover td { background: rgba(255, 214, 10, 0.14); }
+  html:not([data-theme="light"]) .btn--danger { background: var(--surface); border-color: rgba(255, 69, 58, 0.4); }
+  html:not([data-theme="light"]) .btn--danger:hover { background: rgba(255, 69, 58, 0.12); }
+  html:not([data-theme="light"]) .btn--primary:hover { background: #38a1ff; border-color: #38a1ff; }
+  html:not([data-theme="light"]) .btn--soft:hover { background: rgba(41, 151, 255, 0.24); }
+  html:not([data-theme="light"]) .app-sidebar__mark { background: var(--accent); color: #000000; }
 }
 
 /* ---------------- Theme Toggle Button ---------------- */

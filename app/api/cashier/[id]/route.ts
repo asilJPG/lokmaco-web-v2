@@ -31,8 +31,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const session = await requireSession();
-  if (session.role.split(':')[0] !== 'admin') {
-    return Response.json({ error: 'Только администратор может редактировать смену' }, { status: 403 });
+  const role = session.role.split(':')[0];
+  if (role !== 'admin' && role !== 'director') {
+    return Response.json({ error: 'Только администратор или директор может редактировать смену' }, { status: 403 });
   }
 
   const filialIds = await getCurrentFilialIds();

@@ -17,13 +17,13 @@ export async function POST(req: Request) {
   const { code } = await req.json();
   if (!code || String(code).length < 4) {
     await noteLoginFailure(ip);
-    return Response.json({ error: 'Код должен быть не менее 4 символов' }, { status: 400 });
+    return Response.json({ error: 'Пароль должен содержать от 4 символов' }, { status: 400 });
   }
 
   const user = await getUserByAccessCode(String(code));
   if (!user) {
     await noteLoginFailure(ip);
-    return Response.json({ error: 'Пользователь не найден' }, { status: 401 });
+    return Response.json({ error: 'Неверный пароль' }, { status: 401 });
   }
 
   // Директора обязаны входить по Face ID / Touch ID — но только если ключ

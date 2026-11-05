@@ -47,7 +47,8 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 export default async function ShiftPage({ params }: { params: { id: string } }) {
   const session = await getSession();
-  const isAdmin = session && baseRole(session.role) === 'admin';
+  const role = session ? baseRole(session.role) : '';
+  const canEdit = role === 'admin' || role === 'director';
   const filialIds = await getCurrentFilialIds();
   if (filialIds.length === 0) notFound();
 
@@ -74,17 +75,28 @@ export default async function ShiftPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="grid">
-      <div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Link href="/dashboard/history" className="btn btn--sm">← К истории смен</Link>
-          {isAdmin && <Link href={`/dashboard/history/${params.id}/edit`} className="btn btn--sm">✏️ Редактировать</Link>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <Link href="/dashboard/history" className="btn btn--sm">← К истории смен</Link>
+          </div>
+          <h1 className="page-title">
+            Смена {fmtDate(d.selected_date || '')}
+          </h1>
+          <p className="page-subtitle">
+            Кассир: {row.userName} · документ <Copyable value={row.documentNumber || '—'} />
+          </p>
         </div>
-        <h1 className="page-title" style={{ marginTop: 12 }}>
-          Смена {fmtDate(d.selected_date || '')}
-        </h1>
-        <p className="page-subtitle">
-          Кассир: {row.userName} · документ <Copyable value={row.documentNumber || '—'} />
-        </p>
+
+        {canEdit && (
+          <Link
+            href={`/dashboard/history/${params.id}/edit`}
+            className="btn btn--primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '10px 18px' }}
+          >
+            ✏️ Изменить кассовую смену
+          </Link>
+        )}
       </div>
 
       <div className="stat-grid">
@@ -139,16 +151,18 @@ export default async function ShiftPage({ params }: { params: { id: string } }) 
       </section>
 
       <section className="card">
-        <h2 className="card__title">🛒 Расходы ({expenses.length})</h2>
+        <h2 className="card__title">🛒 Расходы</h2>
         {expenses.length === 0 ? (
-          <div className="empty-state">Расходов не было</div>
+          <div className="empty-state">Расходов нет</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <tbody>
               {expenses.map((e, i) => (
                 <tr key={i} style={{ borderTop: i ? '1px solid var(--border)' : 'none' }}>
                   <td style={{ padding: '10px 0' }}>{e.name}</td>
-                  <td style={{ padding: '10px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(Number(e.amount) || 0)}</td>
+                  <td style={{ padding: '10px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--red)' }}>
+                    {fmtMoney(Number(e.amount) || 0)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -161,16 +175,24 @@ export default async function ShiftPage({ params }: { params: { id: string } }) 
       </section>
 
       <section className="card">
-        <h2 className="card__title">👥 Зарплаты ({wages.length})</h2>
+        <div className="card__title"><span className="card__title-text">👥 Зарплаты сотрудников</span></div>
         {wages.length === 0 ? (
-          <div className="empty-state">Зарплат в эту смену не выдавали</div>
+          <div className="empty-state">Выплат зарплат нет</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase' }}>
+                <th style={{ padding: '8px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Сотрудник</th>
+                <th style={{ padding: '8px 0', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Сумма</th>
+              </tr>
+            </thead>
             <tbody>
               {wages.map((w, i) => (
-                <tr key={i} style={{ borderTop: i ? '1px solid var(--border)' : 'none' }}>
-                  <td style={{ padding: '10px 0' }}>{w.name}</td>
-                  <td style={{ padding: '10px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(Number(w.wage) || 0)}</td>
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '8px 0' }}>{w.name}</td>
+                  <td style={{ padding: '8px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                    {fmtMoney(Number(w.wage) || 0)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -199,6 +221,18 @@ export default async function ShiftPage({ params }: { params: { id: string } }) 
             </tbody>
           </table>
         </section>
+      )}
+
+      {canEdit && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+          <Link
+            href={`/dashboard/history/${params.id}/edit`}
+            className="btn btn--primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '10px 18px' }}
+          >
+            ✏️ Изменить кассовую смену
+          </Link>
+        </div>
       )}
     </div>
   );

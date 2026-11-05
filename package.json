@@ -19,6 +19,7 @@
     "@types/xml2js": "^0.4.14",
     "drizzle-orm": "^0.36.4",
     "jsqr": "^1.4.0",
+    "motion": "^13.4.6",
     "next": "14.2.18",
     "pg": "^8.13.1",
     "qrcode": "^1.5.4",
@@ -37,6 +38,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.18",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.12"
   }
 }
