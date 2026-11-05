@@ -4,6 +4,8 @@ import { db, schema } from '@/db/client';
 import { and, eq, inArray, sql, gte, lte, isNull } from 'drizzle-orm';
 import { baseRole } from '@/lib/access';
 import { computeWindows, isBazaarExpense, toTashkentDate } from '@/lib/bazaar';
+import type { InvoiceEntry } from '@/lib/bazaar';
+import { fetchIikoCashInvoices } from '@/lib/bazaar-iiko';
 import { todayTashkent } from '@/lib/period';
 
 export const dynamic = 'force-dynamic';
@@ -83,27 +85,26 @@ export async function GET() {
     }
   }
 
-  const invoiceRows = await db
-    .select()
-    .from(schema.botActions)
-    .where(and(
-      inArray(schema.botActions.filialId, filialIds),
-      eq(schema.botActions.actionType, 'invoice'),
-    ));
-
-  const invoices: { id: number; date: string; total: number; document?: string }[] = [];
-  for (const row of invoiceRows) {
-    const d = (row.details || {}) as Details;
-    if (d.supplier_name !== 'Наличные') continue;
-    if (d.status === 'failed') continue;
-    const date = toTashkentDate(row.createdAt);
-    if (date < minDate || date > maxDate) continue;
-    const items = Array.isArray(d.items) ? d.items : [];
-    const total = items.reduce((s: number, it: any) => {
-      const t = num(it.total);
-      return s + (t || num(it.price) * num(it.quantity));
-    }, 0);
-    invoices.push({ id: row.id, date, total, document: row.documentNumber || undefined });
+  // Накладные берём напрямую из iiko (источник правды), а не из наших
+  // TG-записей: отредактированную внутри iiko накладную наша база не увидит.
+  const invoices: InvoiceEntry[] = [];
+  const seen = new Set<string>();
+  try {
+    for (const fid of filialIds) {
+      const iikoInvoices = await fetchIikoCashInvoices(fid, minDate, maxDate);
+      for (const inv of iikoInvoices) {
+        // Один iiko-сервер на несколько филиалов вернёт одни и те же документы —
+        // дедупим по id документа.
+        if (inv.docId && seen.has(inv.docId)) continue;
+        if (inv.docId) seen.add(inv.docId);
+        invoices.push({ date: inv.date, total: inv.total, document: inv.document });
+      }
+    }
+  } catch (e) {
+    return Response.json(
+      { error: `Не удалось получить накладные из iiko: ${e instanceof Error ? e.message : 'ошибка'}` },
+      { status: 502 },
+    );
   }
 
   const windows = computeWindows(activeCounts, given, invoices);

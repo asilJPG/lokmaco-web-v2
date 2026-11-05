@@ -1,6 +1,6 @@
 type BalanceMark = { id: number; date: string; leftover: number; comment?: string; by: string };
 type GivenEntry = { date: string; amount: number; name: string };
-export type InvoiceEntry = { id: number; date: string; total: number; document?: string };
+export type InvoiceEntry = { id?: number; date: string; total: number; document?: string };
 
 export type BazaarWindow = {
   from: string;
