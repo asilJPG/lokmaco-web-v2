@@ -27,6 +27,13 @@ export type BazaarWindow = {
   suspicious: boolean;
 };
 
+/** Предыдущий календарный день для даты YYYY-MM-DD. */
+function dayBefore(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export function computeWindows(
   counts: BalanceMark[],
   given: GivenEntry[],
@@ -41,12 +48,15 @@ export function computeWindows(
     const prev = sorted[i - 1], cur = sorted[i];
     // Кассир записывает выдачу на базар в своей смене за день N (вечером при
     // закрытии кассы), а снабженец едет на базар и покупает на следующий день
-    // N+1 — тогда и проводятся накладные. Поэтому выдачи берём со сдвигом на
-    // день назад относительно накладных: закуп дня cur сверяется с выдачей,
-    // записанной накануне. Отсюда разные границы:
-    //   выдачи   [prev, cur) — записаны в день prev, под закуп дня cur;
-    //   накладные (prev, cur] — проведены в день cur.
-    const givenIn = given.filter(g => g.date >= prev.date && g.date < cur.date);
+    // N+1 — тогда и проводятся накладные. Поэтому выдачу берём строго за день
+    // перед закрытием окна (cur − 1 календарный день), а не за весь период от
+    // прошлой отметки: касса вносится каждый день, выдача за вчера всегда есть.
+    // Если промежуточный день пропущен в отметках — его выдача просто не
+    // сверяется, а не слипается с текущим окном.
+    //   выдачи   — ровно день cur − 1;
+    //   накладные (prev, cur] — проведены в день cur (или за пропущенные дни).
+    const prevDay = dayBefore(cur.date);
+    const givenIn = given.filter(g => g.date === prevDay);
     const invIn = invoices.filter(v => v.date > prev.date && v.date <= cur.date);
     const givenSum = givenIn.reduce((s, g) => s + g.amount, 0);
     const spent = prev.leftover + givenSum - cur.leftover;
