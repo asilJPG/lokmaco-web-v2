@@ -28,7 +28,11 @@ export function computeWindows(
   const windows: BazaarWindow[] = [];
   for (let i = 1; i < sorted.length; i++) {
     const prev = sorted[i - 1], cur = sorted[i];
-    const givenIn = given.filter(g => g.date >= prev.date && g.date < cur.date);
+    // Остаток снимается вечером после закупа, поэтому вся активность дня уже
+    // «зашита» в вечернюю отметку этого дня. Окно (prev, cur] — это дни после
+    // прошлой отметки по текущую включительно; выдачи и накладные берём по
+    // одной границе, иначе они разъезжаются на день.
+    const givenIn = given.filter(g => g.date > prev.date && g.date <= cur.date);
     const invIn = invoices.filter(v => v.date > prev.date && v.date <= cur.date);
     const givenSum = givenIn.reduce((s, g) => s + g.amount, 0);
     const spent = prev.leftover + givenSum - cur.leftover;
