@@ -210,7 +210,7 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
                 <div className="stat-card" style={{ padding: 12 }}>
                   <div className="stat-card__label" style={{ fontSize: 11 }}>Выдали на базар</div>
                   <div className="stat-card__value" style={{ fontSize: 16 }}>+{fmtMoney(w.givenSum)}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>за период</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>выдано кассиром накануне</div>
                 </div>
                 <div className="stat-card" style={{ padding: 12 }}>
                   <div className="stat-card__label" style={{ fontSize: 11 }}>Остаток на {fmtDate(w.to)}</div>

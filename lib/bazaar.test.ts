@@ -5,13 +5,13 @@ function mk(date: string, leftover: number, repaid = 0) {
   return { id: 1, date, leftover, repaid, by: 'test' };
 }
 
-// Модель: остаток снимается вечером после закупа. Окно (prev, cur] —
-// активность дней после прошлой отметки по текущую включительно. Выдачи и
-// накладные берутся по одной границе.
+// Модель: кассир записывает выдачу на базар в смене за день N, снабженец
+// покупает на следующий день N+1 (тогда и накладные). Поэтому в окне (prev, cur]
+// выдачи берутся за день prev [prev, cur), а накладные — за день cur (prev, cur].
 describe('computeWindows', () => {
   test('пример владельца — ok', () => {
-    const counts = [mk('2026-11-03', 500_000), mk('2026-11-04', 1_000_000)];
-    const given = [{ date: '2026-11-04', amount: 3_000_000, name: 'бозор' }];
+    const counts = [mk('2026-11-03', 0), mk('2026-11-04', 500_000)];
+    const given = [{ date: '2026-11-03', amount: 3_000_000, name: 'бозор' }];
     const invoices = [
       { id: 1, date: '2026-11-04', total: 1_500_000 },
       { id: 2, date: '2026-11-04', total: 1_000_000 },
@@ -23,26 +23,26 @@ describe('computeWindows', () => {
   });
 
   test('не хватает накладных — missing', () => {
-    const counts = [mk('2026-11-03', 500_000), mk('2026-11-04', 1_000_000)];
-    const given = [{ date: '2026-11-04', amount: 3_000_000, name: 'бозор' }];
+    const counts = [mk('2026-11-03', 0), mk('2026-11-04', 500_000)];
+    const given = [{ date: '2026-11-03', amount: 3_000_000, name: 'бозор' }];
     const invoices = [{ id: 1, date: '2026-11-04', total: 2_100_000 }];
     const [w] = computeWindows(counts, given, invoices);
-    expect(w.diff).toBe(400_000);
+    expect(w.shortfall).toBe(400_000);
     expect(w.status).toBe('missing');
   });
 
-  test('накладных больше — over', () => {
-    const counts = [mk('2026-11-03', 500_000), mk('2026-11-04', 1_000_000)];
-    const given = [{ date: '2026-11-04', amount: 3_000_000, name: 'бозор' }];
+  test('накладных больше — привёз в долг', () => {
+    const counts = [mk('2026-11-03', 0), mk('2026-11-04', 500_000)];
+    const given = [{ date: '2026-11-03', amount: 3_000_000, name: 'бозор' }];
     const invoices = [{ id: 1, date: '2026-11-04', total: 3_300_000 }];
     const [w] = computeWindows(counts, given, invoices);
-    expect(w.diff).toBe(-800_000);
+    expect(w.inDebt).toBe(800_000);
     expect(w.status).toBe('over');
   });
 
   test('допуск — разница 30 000 при потрачено 2 500 000 — ok', () => {
-    const counts = [mk('2026-11-03', 500_000), mk('2026-11-04', 1_000_000)];
-    const given = [{ date: '2026-11-04', amount: 3_000_000, name: 'бозор' }];
+    const counts = [mk('2026-11-03', 0), mk('2026-11-04', 500_000)];
+    const given = [{ date: '2026-11-03', amount: 3_000_000, name: 'бозор' }];
     const invoices = [{ id: 1, date: '2026-11-04', total: 2_470_000 }];
     const [w] = computeWindows(counts, given, invoices);
     expect(w.status).toBe('ok');
@@ -51,27 +51,27 @@ describe('computeWindows', () => {
 
   test('перенос остатка', () => {
     const counts = [mk('2026-11-04', 500_000), mk('2026-11-05', 300_000)];
-    const given = [{ date: '2026-11-05', amount: 2_000_000, name: 'бозор' }];
+    const given = [{ date: '2026-11-04', amount: 2_000_000, name: 'бозор' }];
     const invoices = [{ id: 1, date: '2026-11-05', total: 2_200_000 }];
     const [w] = computeWindows(counts, given, invoices);
     expect(w.spent).toBe(2_200_000);
     expect(w.status).toBe('ok');
   });
 
-  test('выдача в день прошлой отметки — не входит', () => {
+  test('выдача в день отметки закрытия — не входит (берётся за прошлый день)', () => {
     const counts = [mk('2026-11-04', 0), mk('2026-11-05', 0)];
     const given = [
       { date: '2026-11-04', amount: 1_000_000, name: 'бозор' },
       { date: '2026-11-05', amount: 2_000_000, name: 'бозор' },
     ];
-    const invoices = [{ id: 1, date: '2026-11-05', total: 2_000_000 }];
+    const invoices = [{ id: 1, date: '2026-11-05', total: 1_000_000 }];
     const [w] = computeWindows(counts, given, invoices);
-    expect(w.givenSum).toBe(2_000_000);
+    expect(w.givenSum).toBe(1_000_000);
   });
 
   test('приход в день прошлой отметки — не входит', () => {
     const counts = [mk('2026-11-04', 0), mk('2026-11-05', 0)];
-    const given = [{ date: '2026-11-05', amount: 1_000_000, name: 'бозор' }];
+    const given = [{ date: '2026-11-04', amount: 1_000_000, name: 'бозор' }];
     const invoices = [
       { id: 1, date: '2026-11-04', total: 500_000 },
       { id: 2, date: '2026-11-05', total: 500_000 },
@@ -81,11 +81,11 @@ describe('computeWindows', () => {
     expect(w.invoiceCount).toBe(1);
   });
 
-  test('окно в два дня — выдачи и приходы за оба дня', () => {
+  test('окно в два дня', () => {
     const counts = [mk('2026-11-01', 0), mk('2026-11-03', 400_000)];
     const given = [
+      { date: '2026-11-01', amount: 3_000_000, name: 'бозор' },
       { date: '2026-11-02', amount: 3_000_000, name: 'бозор' },
-      { date: '2026-11-03', amount: 3_000_000, name: 'бозор' },
     ];
     const invoices = [{ id: 1, date: '2026-11-03', total: 5_600_000 }];
     const [w] = computeWindows(counts, given, invoices);
@@ -104,7 +104,7 @@ describe('computeWindows', () => {
 
   test('остаток больше денег — suspicious', () => {
     const counts = [mk('2026-11-03', 0), mk('2026-11-04', 5_000_000)];
-    const given = [{ date: '2026-11-04', amount: 1_000_000, name: 'бозор' }];
+    const given = [{ date: '2026-11-03', amount: 1_000_000, name: 'бозор' }];
     const [w] = computeWindows(counts, given, []);
     expect(w.suspicious).toBe(true);
     expect(w.spent).toBe(-4_000_000);
@@ -121,15 +121,15 @@ describe('computeWindows', () => {
   });
 
   test('погашение закрывает долг и гасит ложную «не хватает»', () => {
+    // 01→02: накладная 02 на 1 млн, выдачи нет → привезли в долг.
+    // 02→03: выдача записана 02 (под закуп 03), накладных нет, 1 млн погашен.
     const counts = [mk('2026-11-01', 0), mk('2026-11-02', 0), mk('2026-11-03', 0, 1_000_000)];
-    const given = [{ date: '2026-11-03', amount: 1_000_000, name: 'бозор' }];
+    const given = [{ date: '2026-11-02', amount: 1_000_000, name: 'бозор' }];
     const invoices = [{ id: 1, date: '2026-11-02', total: 1_000_000 }];
     const [recent, older] = computeWindows(counts, given, invoices);
-    // старое окно 01→02: привезли в долг на 1 млн
     expect(older.inDebt).toBe(1_000_000);
     expect(older.debtAfter).toBe(1_000_000);
     expect(older.status).toBe('over');
-    // свежее окно 02→03: выдали 1 млн, накладных нет, но это погашение долга
     expect(recent.shortfall).toBe(0);
     expect(recent.debtAfter).toBe(0);
     expect(recent.status).toBe('ok');
@@ -137,7 +137,7 @@ describe('computeWindows', () => {
 
   test('частичное погашение — остаток идёт в «не хватает»', () => {
     const counts = [mk('2026-11-04', 0), mk('2026-11-05', 0, 600_000)];
-    const given = [{ date: '2026-11-05', amount: 1_000_000, name: 'бозор' }];
+    const given = [{ date: '2026-11-04', amount: 1_000_000, name: 'бозор' }];
     const [w] = computeWindows(counts, given, []);
     expect(w.spent).toBe(1_000_000);
     expect(w.repaid).toBe(600_000);

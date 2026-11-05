@@ -39,11 +39,14 @@ export function computeWindows(
   let debt = 0;
   for (let i = 1; i < sorted.length; i++) {
     const prev = sorted[i - 1], cur = sorted[i];
-    // Остаток снимается вечером после закупа, поэтому вся активность дня уже
-    // «зашита» в вечернюю отметку этого дня. Окно (prev, cur] — это дни после
-    // прошлой отметки по текущую включительно; выдачи и накладные берём по
-    // одной границе, иначе они разъезжаются на день.
-    const givenIn = given.filter(g => g.date > prev.date && g.date <= cur.date);
+    // Кассир записывает выдачу на базар в своей смене за день N (вечером при
+    // закрытии кассы), а снабженец едет на базар и покупает на следующий день
+    // N+1 — тогда и проводятся накладные. Поэтому выдачи берём со сдвигом на
+    // день назад относительно накладных: закуп дня cur сверяется с выдачей,
+    // записанной накануне. Отсюда разные границы:
+    //   выдачи   [prev, cur) — записаны в день prev, под закуп дня cur;
+    //   накладные (prev, cur] — проведены в день cur.
+    const givenIn = given.filter(g => g.date >= prev.date && g.date < cur.date);
     const invIn = invoices.filter(v => v.date > prev.date && v.date <= cur.date);
     const givenSum = givenIn.reduce((s, g) => s + g.amount, 0);
     const spent = prev.leftover + givenSum - cur.leftover;
