@@ -141,10 +141,13 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
           onClick={() => setExpanded(expanded === i ? null : i)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>
-                {fmtDate(w.from)} → {fmtDate(w.to)}
+              <div style={{ fontWeight: 700, fontSize: 18 }}>
+                {fmtDate(w.to)}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                период с {fmtDate(w.from)}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
                 Потрачено {fmtMoney(w.spent)} · Накладных {fmtMoney(w.entered)} ({w.invoiceCount} шт.)
               </div>
             </div>
@@ -178,20 +181,24 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
               onClick={e => e.stopPropagation()}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8, marginBottom: 12 }}>
                 <div className="stat-card" style={{ padding: 12 }}>
-                  <div className="stat-card__label" style={{ fontSize: 11 }}>Было у снабженца</div>
+                  <div className="stat-card__label" style={{ fontSize: 11 }}>Остаток на {fmtDate(w.from)}</div>
                   <div className="stat-card__value" style={{ fontSize: 16 }}>{fmtMoney(w.openingLeftover)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>было у снабженца</div>
                 </div>
                 <div className="stat-card" style={{ padding: 12 }}>
-                  <div className="stat-card__label" style={{ fontSize: 11 }}>Выдал кассир</div>
-                  <div className="stat-card__value" style={{ fontSize: 16 }}>{fmtMoney(w.givenSum)}</div>
+                  <div className="stat-card__label" style={{ fontSize: 11 }}>Выдали на базар</div>
+                  <div className="stat-card__value" style={{ fontSize: 16 }}>+{fmtMoney(w.givenSum)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>за период</div>
                 </div>
                 <div className="stat-card" style={{ padding: 12 }}>
-                  <div className="stat-card__label" style={{ fontSize: 11 }}>Остаток вернулся</div>
-                  <div className="stat-card__value" style={{ fontSize: 16 }}>{fmtMoney(w.leftover)}</div>
+                  <div className="stat-card__label" style={{ fontSize: 11 }}>Остаток на {fmtDate(w.to)}</div>
+                  <div className="stat-card__value" style={{ fontSize: 16 }}>−{fmtMoney(w.leftover)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>осталось у снабженца</div>
                 </div>
-                <div className="stat-card" style={{ padding: 12 }}>
-                  <div className="stat-card__label" style={{ fontSize: 11 }}>Потрачено</div>
-                  <div className="stat-card__value" style={{ fontSize: 16 }}>{fmtMoney(w.spent)}</div>
+                <div className="stat-card" style={{ padding: 12, background: 'var(--surface-2, rgba(0,0,0,0.03))' }}>
+                  <div className="stat-card__label" style={{ fontSize: 11 }}>Потрачено на закуп</div>
+                  <div className="stat-card__value" style={{ fontSize: 16, fontWeight: 700 }}>{fmtMoney(w.spent)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>было + выдали − осталось</div>
                 </div>
               </div>
 
