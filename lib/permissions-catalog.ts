@@ -66,6 +66,7 @@ export const SECTIONS_CATALOG: SectionGroup[] = [
     title: 'Финансы',
     icon: '💰',
     sections: [
+      { id: 'bazaar', title: 'Сверка закупа', description: 'Сверка выдач на базар с внесёнными накладными', icon: '🛒' },
       { id: 'safe', title: 'Сейф', description: 'Движение наличных средств в сейфе заведения', icon: '💰' },
       { id: 'wages', title: 'Зарплаты', description: 'Учёт выплат авансов и зарплат сотрудникам', icon: '👥' },
       { id: 'pnl', title: 'Управленческий P&L', description: 'Сводный финансовый результат ресторанов', icon: '📈' },
