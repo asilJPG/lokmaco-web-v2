@@ -20,6 +20,7 @@ export type Section =
   | 'writeoff' | 'services' | 'documents' | 'assets'
   | 'analytics' | 'analytics.pl' | 'analytics.abc' | 'analytics.liquidity'
   | 'analytics.sales' | 'analytics.purchases' | 'analytics.waiters'
+  | 'bazaar'
   | 'safe' | 'wages' | 'pnl' | 'reconciliation' | 'taxReport'
   | 'adminUsers' | 'adminFilials';
 
@@ -70,6 +71,9 @@ const ACCESS: Record<Section, readonly string[] | typeof ALL> = {
   'analytics.sales': ['admin', 'director'],
   'analytics.purchases': ['admin', 'director'],
   'analytics.waiters': ['admin', 'director', 'manager'],
+
+  // Сверка закупа на базаре — бухгалтер вносит остаток, админ всё + удаление.
+  bazaar: ['admin', 'accountant', 'director'],
 
   // cash_expenses и wages — admin/director.
   safe: ['admin', 'director'],
@@ -136,6 +140,7 @@ const HREF_TO_SECTION: Record<string, Section> = {
   '/dashboard/documents': 'documents',
   '/dashboard/assets': 'assets',
   '/dashboard/analytics': 'analytics',
+  '/dashboard/bazaar': 'bazaar',
   '/dashboard/safe': 'safe',
   '/dashboard/wages': 'wages',
   '/dashboard/pnl': 'pnl',

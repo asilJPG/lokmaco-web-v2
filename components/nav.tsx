@@ -66,6 +66,7 @@ const GROUPS: Group[] = [
   {
     title: 'Финансы',
     items: [
+      { href: '/dashboard/bazaar', label: 'Сверка закупа', icon: '🛒', section: 'bazaar' },
       { href: '/dashboard/safe', label: 'Сейф', icon: '💰', section: 'safe' },
       { href: '/dashboard/wages', label: 'Зарплаты', icon: '👥', section: 'wages' },
       { href: '/dashboard/pnl', label: 'P&L', icon: '📈', section: 'pnl' },
