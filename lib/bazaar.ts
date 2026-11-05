@@ -54,7 +54,7 @@ export function computeWindows(
   return windows.reverse();
 }
 
-const BAZAAR_RE = /(бозор|базар|bozor|bazar)/i;
+const BAZAAR_RE = /(бозор|базор|базар|bozor|bazar|bazor)/i;
 
 export function isBazaarExpense(name: string): boolean {
   return BAZAAR_RE.test(name);
