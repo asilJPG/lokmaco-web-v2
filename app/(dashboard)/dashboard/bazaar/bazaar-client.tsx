@@ -20,7 +20,10 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<number | null>(null);
 
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(() => {
+    const now = new Date(Date.now() + 5 * 3600_000);
+    return now.toISOString().slice(0, 10);
+  });
   const [leftover, setLeftover] = useState('');
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
@@ -55,7 +58,8 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       setSaveMsg(json.updated ? 'Отметка обновлена' : 'Отметка сохранена');
-      setDate('');
+      const now = new Date(Date.now() + 5 * 3600_000);
+      setDate(now.toISOString().slice(0, 10));
       setLeftover('');
       setComment('');
       load();
@@ -202,6 +206,32 @@ export default function BazaarClient({ isAdmin }: { isAdmin: boolean }) {
                           <td style={{ padding: '6px 0', color: 'var(--text-muted)' }}>{g.name}</td>
                           <td style={{ padding: '6px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             {fmtMoney(g.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+
+              {isAdmin && w.invoices && w.invoices.length > 0 && (
+                <>
+                  <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Накладные ({w.invoices.length})</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
+                    <thead>
+                      <tr style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase' }}>
+                        <th style={{ padding: '4px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Дата</th>
+                        <th style={{ padding: '4px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>Документ</th>
+                        <th style={{ padding: '4px 0', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>Сумма</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {w.invoices.map((inv, ii) => (
+                        <tr key={ii} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '6px 0' }}>{fmtDate(inv.date)}</td>
+                          <td style={{ padding: '6px 0', color: 'var(--text-muted)' }}>{inv.document || '—'}</td>
+                          <td style={{ padding: '6px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                            {fmtMoney(inv.total)}
                           </td>
                         </tr>
                       ))}

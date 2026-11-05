@@ -1,6 +1,6 @@
 type BalanceMark = { id: number; date: string; leftover: number; comment?: string; by: string };
 type GivenEntry = { date: string; amount: number; name: string };
-type InvoiceEntry = { id: number; date: string; total: number; document?: string };
+export type InvoiceEntry = { id: number; date: string; total: number; document?: string };
 
 export type BazaarWindow = {
   from: string;
@@ -12,6 +12,7 @@ export type BazaarWindow = {
   spent: number;
   entered: number;
   invoiceCount: number;
+  invoices: InvoiceEntry[];
   diff: number;
   tolerance: number;
   status: 'ok' | 'missing' | 'over';
@@ -45,6 +46,7 @@ export function computeWindows(
       spent,
       entered,
       invoiceCount: invIn.length,
+      invoices: invIn,
       diff,
       tolerance,
       status,
